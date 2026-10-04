@@ -22,7 +22,7 @@ npm run seed -- --db data/experiment.sqlite --seed 7 --products 1000 --shoppers 
 
 Defaults span July 1–September 29, 2026 UTC; chronological cutoff: September 11. Override `--start` (UTC ISO) and `--days` for another past window. Minimums: 35 products, 20 shoppers, 10 days. Generation completes its last coherent session, so the event target is approximate. Seed/configuration determines stable IDs; repeating a completed configuration does nothing. Different configurations append isolated populations; use separate databases when you want one population. The first seed owns the fixed favorites list. Full generation uses one transaction and can block live writes; use a separate database for experiments.
 
-Sessions mix category/brand affinity, budget sensitivity, changing intent, exploration, position-biased clicks, skewed activity/popularity, impulse additions, abandoned carts, and repeat orders. Clicks reference prior impressions. Cart actions require available/listed products. Orders consume persistent carts chronologically and reconcile with purchase events. Delivery corruption is optional in the plan and is not implemented.
+Sessions mix category/brand affinity, budget sensitivity, changing intent, exploration, position-biased clicks, skewed activity/popularity, impulse additions, abandoned carts, and repeat orders. Clicks reference prior impressions. Cart actions require available/listed products. Orders consume persistent carts chronologically and reconcile with purchase events. Delivery corruption is disabled by default. Add `--delivery data/delivery/experiment.ndjson` to write a separate transport experiment with seeded missing, duplicate, and delayed envelopes. Configure `--missing-rate` (default 0.01), `--duplicate-rate` (0.02), and `--max-delay-seconds` (3600). This leaves authoritative events/orders unchanged, retains event timestamps and causal delivery ordering, and reports counts/checksum. Repeating it with the same seed produces identical bytes; choose a new output path. Envelopes distinguish delivery IDs/times from logical events. This experimental artifact is separate from the contiguous, replay-safe Bronze export; no automatic cleaning or model pipeline consumes it.
 
 The last 15% of shopper/product IDs are introduced after the 80%-time cutoff; the last 5% are intentionally unobserved. A separate 10% shopper cohort has at most one session. Actual observed cohort counts depend on seed/scale. Latent preferences and cohort diagnostics live only in `data/generator-diagnostics/<run>.json` (override `--diagnostics`), never operational tables or Bronze exports. Run metadata retains configuration and counts, not latent vectors. Diagnostics are simulator internals, not model inputs. Synthetic evaluation is not evidence of real-world effectiveness. Catalog templates and static availability simplify reality; current snapshots do not reconstruct historical availability.
 
@@ -60,11 +60,18 @@ Exports starting ahead of the cursor are rejected; earlier ranges are safe. A fi
 npm test
 npm run build
 npm run format:check
+# One-time Chromium setup (Linux may require system dependencies):
+npx playwright install --with-deps chromium
+npm run test:browser
 # Real Spark/Delta integration test:
 cd tools/bronze
 uv run python -m unittest discover -s tests -v
 ```
 
+The browser check creates an isolated temporary store and verifies search, product details, cart/persona isolation, reload persistence, checkout/history, mobile overflow, and observed events. Browser observations retry in memory with stable IDs; closing the tab can lose unsent observations. Transactional events are persisted by the backend independently.
+
 API/history checks cover identity isolation, session expiry, checkout retry/rollback, exposure attribution, append-only events, reproducibility, chronological carts/orders, references, and cold/unobserved cohorts. Spark checks cover crash recovery, replay, incremental/empty batches, snapshots, monotonic cursors, checksums, and skipped ranges.
 
 `npm run reset:carts` clears only live carts and appends backend removal events. Synthetic carts, orders, identities, and existing learning events remain. Rebuild Bronze by using a new `--root data/bronze-rebuild` and replaying from zero. Do not keep an old cursor after removing its tables. Start separate store experiments with a new `STORE_DB`, which receives a distinct source ID. Preserve/export learning records before intentionally discarding a database.
+
+Validation on the implementation host included 10,000 products, 20,000 shoppers, and 1,000,014 generated events, plus ingestion of a real 20,013-event export into Delta. These are local feasibility observations, not a throughput guarantee.
