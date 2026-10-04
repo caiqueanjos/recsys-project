@@ -13,8 +13,12 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 
 ## Architecture and ownership
 
-- `apps/web`: planned React/Vite storefront.
-- `apps/store-api`: planned separate TypeScript backend for catalog, shoppers, sessions, carts, orders, and event ingestion.
+- `apps/web`: implemented React/Vite storefront with local-state navigation and a development proxy to the store API.
+- `apps/store-api`: implemented Fastify/TypeScript backend using Node 24's built-in SQLite support for catalog, shoppers, sessions, carts, orders, and event ingestion.
+- `packages/store-contracts`: shared TypeScript types and Zod validation for the versioned live/synthetic event contract.
+- `tools/generate`: TypeScript catalog/history generation, immutable raw exports, optional delivery-quality simulation, and selective live-cart resets.
+- `tools/validate`: Playwright browser regression checks using an isolated temporary store.
+- `tools/bronze`: explicitly approved standalone Python 3.12 project using Spark 4.0.1 and Delta 4.0.0; separate from the user's Python recommendation projects.
 - One SQLite database initially owns store operational data and event records. PostgreSQL in Docker is a later migration goal.
 - `apps/api` and `packages/recommender`: user-owned Python recommendation platform, not the store backend.
 - Local Bronze Delta ingestion is in scaffolding scope. Silver/Gold pipelines, embeddings, training, candidate retrieval, ranking, evaluation, and recommendation serving belong to the user.
@@ -23,14 +27,30 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 
 - Fixed seeded homepage trending list; no related-product sections on product or cart pages initially.
 - Anonymous shoppers and fake selectable personas. Each shopper retains its cart and purchase history; persona switches begin new sessions.
+- Guest identity persists in localStorage. Reloads also open new sessions; sessions expire after 30 minutes of inactivity. This is a local demo identity mechanism, not authentication.
 - Fake checkout creates an order, records a purchase event, and clears the cart. No real payments or shipping integration.
+- Cart mutations and checkout events commit with their operational changes. Preserve checkout idempotency and rollback behavior.
 - Browser instrumentation records observed behavior; the store backend records successful transactional actions.
+- Visible-product impressions include surface and one-based position; clicks reference prior impressions. Never invent model attribution for the fixed trending list or double-count backend transactions as browser events.
 - Synthetic consumer-goods catalog and historical sessions must be reproducible, coherent, and compatible with live event contracts.
 - Include behavioral randomness, exposure/position bias, and time-based cold-start cohorts. Data-quality corruption is optional.
 - Keep generator-only latent preferences out of model inputs. Synthetic evaluation is not evidence of real-world effectiveness.
+- Latent diagnostics belong only in the separate generator diagnostics artifacts, not operational tables or Bronze exports. Optional missing/duplicate/delayed delivery artifacts must not mutate authoritative events or orders.
+- Events are append-only. Operational resets must preserve the learning dataset; the existing reset command clears only live carts and records removal events.
+
+## Local workflow and validation
+
+- Use npm workspaces and Node 24 for store development; keep the existing Python recommendation workspace independent.
+- See `docs/local-development.md` for setup, runtime prerequisites, generation, exports, ingestion, and selective resets. Default SQLite path: `data/store.sqlite`; generated data and runtime artifacts are ignored by Git.
+- Store commands: `npm run dev:api`, `npm run dev:web`, `npm run seed`, `npm run export:bronze`, and `npm run reset:carts`.
+- Run checks appropriate to the change: `npm test` for API/history contracts, `npm run test:browser` for storefront flows, `npm run build` for TypeScript and production assets, and `npm run format:check` for formatting. Chromium and its system dependencies are needed for browser checks.
+- For ingestion changes, run `uv run python -m unittest discover -s tests -v` from `tools/bronze`. Spark requires JDK 17/21, local JVM sockets, and first-run Maven downloads.
+- Bronze preserves raw JSON, provenance, event/ingestion times, and catalog snapshot identity/time. Preserve source-specific durable cursors, replay-safe merges, conflict/gap rejection, and crash recovery. No Silver/Gold transformations belong in this scaffold.
+- Catalog snapshots capture export-time state; they do not reconstruct historical availability. Synthetic scale measurements are local feasibility observations, not throughput guarantees.
+- Make small, coherent commits as work is verified, consistent with the user's request to commit often.
 
 ## Reference and plan
 
-Follow `docs/implementation-plan.md` for scope, stages, and unresolved details. The architectural reference is https://www.databricks.com/blog/real-time-retail-intelligence-building-e-commerce-recommendations-lakebase-and-ai-search.
+Follow `docs/implementation-plan.md` for agreed scope and implementation decisions; all six scaffold stages are implemented. Use `docs/store-contract.md` for endpoint/event semantics and `docs/local-development.md` for runnable workflows. The architectural reference is https://www.databricks.com/blog/real-time-retail-intelligence-building-e-commerce-recommendations-lakebase-and-ai-search.
 
 Preserve the distinction between offline event ingestion and direct session context in future online recommendation requests. SQLite is the store database, not the analytical lakehouse or recommendation feature store.
