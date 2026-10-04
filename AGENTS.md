@@ -51,6 +51,6 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 
 ## Reference and plan
 
-Follow `docs/implementation-plan.md` for agreed scope and implementation decisions; all six scaffold stages are implemented. Use `docs/store-contract.md` for endpoint/event semantics and `docs/local-development.md` for runnable workflows. The architectural reference is https://www.databricks.com/blog/real-time-retail-intelligence-building-e-commerce-recommendations-lakebase-and-ai-search.
+Use `docs/README.md` as the documentation index for current implementation explanations and feature references. Follow `docs/implementation-plan.md` for agreed scope and implementation decisions; all six scaffold stages are implemented. Use `docs/store-contract.md` for endpoint/event semantics and `docs/local-development.md` for runnable workflows. The architectural reference is https://www.databricks.com/blog/real-time-retail-intelligence-building-e-commerce-recommendations-lakebase-and-ai-search.
 
 Preserve the distinction between offline event ingestion and direct session context in future online recommendation requests. SQLite is the store database, not the analytical lakehouse or recommendation feature store.

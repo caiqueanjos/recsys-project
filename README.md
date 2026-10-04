@@ -2,7 +2,7 @@
 
 A consumer-goods store scaffold for learning recommendation engineering. React/Vite (`apps/web`) and a TypeScript/SQLite API (`apps/store-api`) support browsing, personas, carts, demo checkout, and observed behavior. Reproducible synthetic history and raw local Spark/Delta ingestion provide offline data.
 
-See the [local runbook](docs/local-development.md), [store contract](docs/store-contract.md), and [implementation plan](docs/implementation-plan.md).
+Start with the [documentation index](docs/README.md) for the scaffold-to-feature guide and a hands-on tutorial. See the [local runbook](docs/local-development.md), [store contract](docs/store-contract.md), and [implementation plan](docs/implementation-plan.md).
 
 ```sh
 npm ci
