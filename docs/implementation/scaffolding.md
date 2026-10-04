@@ -2,7 +2,7 @@
 
 Understand which workspace owns each part before running or extending the project. This is an explanation of the current scaffold, not a reconstruction of its commit history.
 
-To create a new repository with these boundaries, follow the [workspace setup tutorial](workspace-setup.md). It builds a minimal runnable frontend/API/shared-package example and optionally adds the independent Python projects.
+To create a new repository with these boundaries, follow the [workspace setup tutorial](workspace-setup.md). It uses npm, Vite, TypeScript, and uv initializers, then connects the generated frontend/API/shared packages and optionally adds the independent Python projects.
 
 ## Repository map
 
