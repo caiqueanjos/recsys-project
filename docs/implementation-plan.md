@@ -1,6 +1,6 @@
 # Store MVP and recommendation learning scaffold
 
-Status: agreed scope; implementation not started. This document does not authorize implementation beyond the user's current request.
+Status: store scaffold implemented under the user's request to execute this plan. All six stages are complete; recommendation-platform work remains user-owned. See [local runbook](local-development.md) for commands and limitations.
 
 ## Goal and working relationship
 
@@ -91,12 +91,12 @@ Validation should cover cart isolation/persistence, session changes, order/event
 - Keep catalog hydration and store transactions in the store API. Retrieval, feature assembly, scoring, and reranking belong to the recommendation platform.
 - Define timeouts/fallbacks when integration is implemented; the fixed list can remain a baseline/fallback.
 
-## Decisions deferred until implementation
+## Implementation decisions
 
-- TypeScript API framework, ORM/database access, package manager, styling, and testing tools.
-- Session expiry policy, browser identity persistence, and detailed endpoint schemas.
-- Exact generation distributions, cold-start proportions, and achievable local scale.
-- Location and ownership of generation/ingestion tooling. Confirm before adding Python scaffold code, since the user's Python projects are reserved for their learning work.
-- Local Spark/Delta runtime setup and export/ingestion cadence.
+- npm workspaces, Fastify, Node 24 built-in SQLite, React/Vite, CSS, Node tests, and Playwright browser checks; no ORM.
+- Persistent localStorage guest identity; persona switches/reloads start sessions; 30-minute inactivity expiry. Endpoint/event schemas are documented in [store contract](store-contract.md).
+- Configurable seeded simulation, 15% time-based cold entities, 5% reserved unobserved entities, 10% sparse shoppers, separate optional delivery-quality artifacts. Latent diagnostics are excluded from operational/Bronze inputs.
+- TypeScript generation/export tooling in `tools/generate`; the user explicitly approved standalone Python ingestion in `tools/bronze`, separate from the reserved recommendation projects.
+- Python 3.12, Spark 4.0.1, Delta 4.0.0, JDK 17/21; manual immutable exports and replay-safe local ingestion.
 
-Resolve these with focused tradeoff discussions; do not reopen confirmed architectural decisions unnecessarily.
+Validation completed: API/history tests, desktop/mobile browser flows, production build, full proposed generation scale (10k products/20k shoppers/~1m events), actual SQLite-to-Delta ingestion, and failure/replay tests. Details and constraints are in the runbook.

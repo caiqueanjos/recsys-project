@@ -62,6 +62,24 @@ class BronzeTest(unittest.TestCase):
             batch(gap, after=4, high=5)
             with self.assertRaisesRegex(ValueError, "skips"):
                 ingest(self.spark, gap, root)
+            changed = Path(temp) / "changed"
+            batch(changed)
+            lines = (changed / "events.ndjson").read_text().splitlines()
+            event = json.loads(lines[0])
+            event["payload"] = '{"id":"e-1","changed":true}'
+            lines[0] = json.dumps(event)
+            content = ("\n".join(lines) + "\n").encode()
+            (changed / "events.ndjson").write_bytes(content)
+            manifest = json.loads((changed / "manifest.json").read_text())
+            manifest["files"]["events.ndjson"]["sha256"] = hashlib.sha256(content).hexdigest()
+            (changed / "manifest.json").write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "changed during replay"):
+                ingest(self.spark, changed, root)
+            missing_table = Path(temp) / "missing-table"
+            missing_table.mkdir()
+            (missing_table / "progress.json").write_text((root / "progress.json").read_text())
+            with self.assertRaisesRegex(ValueError, "table is missing"):
+                ingest(self.spark, first, missing_table)
             (first / "events.ndjson").write_text("corruption")
             with self.assertRaisesRegex(ValueError, "integrity"):
                 verify_batch(first)

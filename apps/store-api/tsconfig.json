@@ -1,1 +1,15 @@
-{"extends":"../../tsconfig.base.json","include":["src","test","../../tools/generate"]}
+{
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "src",
+    "test",
+    "../../tools/generate",
+    "../../tools/validate"
+  ],
+  "compilerOptions": {
+    "lib": [
+      "ES2023",
+      "DOM"
+    ]
+  }
+}

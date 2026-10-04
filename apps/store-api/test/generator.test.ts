@@ -83,6 +83,18 @@ test('seeded history is reproducible, chronological, referentially valid and rec
     }
   }
   const diagnostics = first.diagnostics!;
+  for (const u of first.diagnostics.users.slice(Math.floor(config.shoppers * 0.85)))
+    assert.ok(u.createdAt > first.cutoff);
+  const coldProducts = a.db
+    .prepare('SELECT listedAt FROM products ORDER BY id LIMIT -1 OFFSET ?')
+    .all(Math.floor(config.products * 0.85));
+  assert.ok(coldProducts.every((p) => String(p.listedAt) > first.cutoff));
+  for (const u of first.diagnostics.users.filter((u) => u.sparse))
+    assert.ok(
+      Number(a.db.prepare('SELECT count(*) AS n FROM sessions WHERE shopperId=?').get(u.id)!.n) <=
+        1,
+    );
+
   for (const u of diagnostics.users.filter((u) => u.unobserved))
     assert.equal(
       a.db.prepare('SELECT count(*) AS n FROM events WHERE shopperId=?').get(u.id)!.n,
@@ -109,6 +121,7 @@ test('seeded history is reproducible, chronological, referentially valid and rec
   try {
     const manifest = exportBronze(a, join(dir, 'batch'), 0, '2026-10-01T00:00:00.000Z');
     assert.equal(manifest.files['events.ndjson'].count, before);
+    assert.throws(() => exportBronze(a, join(dir, 'batch')), /already exists/);
     const deliveryConfig = {
       seed: 12,
       missingRate: 0.1,

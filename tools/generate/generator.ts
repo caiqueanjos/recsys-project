@@ -113,7 +113,10 @@ export function generate(store: Store, config: Config) {
   if (config.days < 10) throw new Error('At least 10 days needed for cold-start cohorts');
   const end = Date.parse(config.start) + config.days * 86400000;
   if (end > Date.now()) throw new Error('Historical generation must end in the past');
-  const run = createHash('sha256').update(JSON.stringify(config)).digest('hex').slice(0, 12);
+  const run = createHash('sha256')
+    .update(JSON.stringify({ generatorVersion: 1, ...config }))
+    .digest('hex')
+    .slice(0, 12);
   if (store.db.prepare('SELECT id FROM generation_runs WHERE id=?').get(run))
     return { run, alreadyGenerated: true };
   const rng = random(config.seed),
@@ -158,7 +161,7 @@ export function generate(store: Store, config: Config) {
         cold = n >= Math.floor(config.products * 0.85);
       const listedAt = iso(
         cold
-          ? cutoff + Math.floor(rng() * Math.max(1, config.days * 0.12)) * 86400000
+          ? cutoff + (1 + Math.floor(rng() * Math.max(1, config.days * 0.12))) * 86400000
           : start - 30 * 86400000,
       );
       const p: Product = {
@@ -200,7 +203,9 @@ export function generate(store: Store, config: Config) {
         sparse = n >= Math.floor(config.shoppers * 0.75) && n < Math.floor(config.shoppers * 0.85);
       const user = {
         id: id('shopper', n),
-        createdAt: iso(cold ? cutoff + Math.floor(rng() * config.days * 0.12) * 86400000 : start),
+        createdAt: iso(
+          cold ? cutoff + (1 + Math.floor(rng() * config.days * 0.12)) * 86400000 : start,
+        ),
         interest: Math.floor(rng() * 7),
         brand: Math.floor(rng() * 3),
         budget: 0.5 + rng() * 1.5,

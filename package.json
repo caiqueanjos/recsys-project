@@ -1,11 +1,32 @@
 {
-  "name": "recsys-store", "private": true, "type": "module",
-  "workspaces": ["apps/store-api", "apps/web", "packages/store-contracts"],
+  "name": "recsys-store",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/store-api",
+    "apps/web",
+    "packages/store-contracts"
+  ],
   "scripts": {
-    "dev:api": "npm run dev -w @store/api", "dev:web": "npm run dev -w @store/web",
+    "dev:api": "npm run dev -w @store/api",
+    "dev:web": "npm run dev -w @store/web",
     "build": "npm run build -w @store/contracts && npm run build -w @store/api && npm run build -w @store/web",
-    "test": "npm run test -w @store/api", "seed": "tsx tools/generate/cli.ts",
-    "export:bronze": "tsx tools/generate/export.ts"
+    "test": "npm run test -w @store/api",
+    "seed": "node --import tsx tools/generate/cli.ts",
+    "export:bronze": "node --import tsx tools/generate/export.ts",
+    "reset:carts": "node --import tsx tools/generate/reset-carts.ts",
+    "format": "prettier --write \"apps/store-api/**/*.ts\" \"apps/web/**/*.{ts,tsx,css}\" \"packages/store-contracts/**/*.ts\" \"tools/{generate,validate}/**/*.ts\"",
+    "format:check": "prettier --check \"apps/store-api/**/*.ts\" \"apps/web/**/*.{ts,tsx,css}\" \"packages/store-contracts/**/*.ts\" \"tools/{generate,validate}/**/*.ts\"",
+    "test:browser": "node --import tsx tools/validate/browser.ts"
   },
-  "devDependencies": {"tsx": "^4.20.0", "typescript": "^5.9.0", "@types/node": "^24.0.0"}
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "playwright": "^1.63.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
 }
