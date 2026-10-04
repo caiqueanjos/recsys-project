@@ -20,9 +20,11 @@ export class Store {
       CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, type TEXT NOT NULL, occurredAt TEXT NOT NULL, ingestedAt TEXT NOT NULL, shopperId TEXT NOT NULL REFERENCES shoppers(id), sessionId TEXT NOT NULL REFERENCES sessions(id), source TEXT NOT NULL, payload TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS events_session ON events(sessionId);
       CREATE INDEX IF NOT EXISTS orders_shopper ON orders(shopperId);
+      CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS generation_runs(id TEXT PRIMARY KEY, manifest TEXT NOT NULL);
       CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'Events are append-only'); END;
       CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events BEGIN SELECT RAISE(ABORT,'Events are append-only'); END;`);
+    this.db.prepare('INSERT OR IGNORE INTO metadata VALUES(?,?)').run('sourceId',randomUUID());
   }
   transaction<T>(fn: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');
