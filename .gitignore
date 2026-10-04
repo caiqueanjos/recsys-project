@@ -221,3 +221,10 @@ __marimo__/
 
 # Docs
 docs/private/
+node_modules/
+dist/
+data/
+*.sqlite*
+.env
+__pycache__/
+.venv/
