@@ -10,7 +10,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-Open http://127.0.0.1:5173. API: 127.0.0.1:3001; Vite proxies `/api`. `STORE_DB` changes the SQLite path (default `data/store.sqlite`). `PORT` changes the API port; set `STORE_API_ORIGIN` for Vite to match. Persona switching and reloads open new sessions; each identity retains carts/orders. Guest identity persists in localStorage. Sessions expire after 30 minutes of inactivity. This is a local demo identity system, not authentication. Navigation uses local state and reloads return home. USD prices use integer cents; product art uses category placeholders. Availability is a boolean, not stock accounting. Favorites are a fixed seeded list.
+Open http://127.0.0.1:5173. API: 127.0.0.1:3001; Vite proxies `/api`. `STORE_DB` changes the SQLite path (default `data/store.sqlite`). `PORT` changes the API port; set `STORE_API_ORIGIN` for Vite to match. Persona switching and reloads open new sessions; each identity retains carts/orders. Guest identity persists in localStorage. Sessions expire after 30 minutes of inactivity. This is a local demo identity system, not authentication. Navigation uses React Router: reload keeps the current URL, catalog filters/pagination use query parameters, and product URLs support direct entry. A production host must provide an SPA fallback to `index.html` for frontend paths and route `/api` to the backend. USD prices use integer cents; product art uses category placeholders. Availability is a boolean, not stock accounting. Favorites are a fixed seeded list.
 
 ## Synthetic history
 
@@ -68,7 +68,7 @@ cd tools/bronze
 uv run python -m unittest discover -s tests -v
 ```
 
-The browser check creates an isolated temporary store and verifies search, product details, cart/persona isolation, reload persistence, checkout/history, mobile overflow, and observed events. Browser observations retry in memory with stable IDs; closing the tab can lose unsent observations. Transactional events are persisted by the backend independently.
+The browser check creates an isolated temporary store and verifies URL filters/pagination, Back/Forward, product direct links and refresh, missing routes/products, cart/persona isolation, checkout retry idempotency/history, session recovery, mobile overflow, and observed events. Browser observations retry in memory with stable IDs; closing the tab can lose unsent observations. Transactional events are persisted by the backend independently.
 
 API/history checks cover identity isolation, session expiry, checkout retry/rollback, exposure attribution, append-only events, reproducibility, chronological carts/orders, references, and cold/unobserved cohorts. Spark checks cover crash recovery, replay, incremental/empty batches, snapshots, monotonic cursors, checksums, and skipped ranges.
 

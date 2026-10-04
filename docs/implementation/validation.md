@@ -5,7 +5,7 @@ Use this reference to choose checks when changing a feature. These are existing 
 | Check | What it establishes | Source |
 | --- | --- | --- |
 | `npm test` | Identity/cart isolation, expiry, checkout replay/rollback, event attribution and append-only behavior; deterministic history, chronological references/carts/orders, cohorts, exports and delivery artifacts | [store tests](../../apps/store-api/test/store.test.ts), [generator tests](../../apps/store-api/test/generator.test.ts) |
-| `npm run test:browser` | Search → product → cart → persona switch → reload → checkout/history; expiry recovery, mobile overflow, observed events | [browser.ts](../../tools/validate/browser.ts) |
+| `npm run test:browser` | URL filters/pagination, Back/Forward, product direct links/refresh, missing routes/products; cart/persona isolation, checkout retry/history, expiry recovery, mobile overflow, observed events | [browser.ts](../../tools/validate/browser.ts) |
 | `npm run build` | TypeScript compatibility and Vite production assets | [scripts](../../package.json) |
 | `npm run format:check` | Formatting of configured TypeScript/TSX/CSS paths | [scripts](../../package.json) |
 | Bronze unittest discovery | Real Spark/Delta crash recovery, replay, incremental/empty batches, snapshots, monotonic progress, gap/conflict/checksum/missing-table rejection | [test_ingest.py](../../tools/bronze/tests/test_ingest.py) |

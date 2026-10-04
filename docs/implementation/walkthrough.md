@@ -33,7 +33,7 @@ Open `http://127.0.0.1:5173`. If those ports are already occupied, follow the [r
 
 1. Select Guest, open Shop all, search for `kettle`, open an available item, and add it to the bag.
 2. Switch to Sam. Sam's bag is separate. Switch back to Guest to recover the item.
-3. Reload. The page returns home and opens a new session; Guest's bag remains.
+3. Reload. The current route stays open under a new session; Guest's bag remains.
 4. Open the bag and place a demo order. The bag clears and history displays the order with saved prices. There is no payment.
 
 If the localStorage guest belongs to another database, startup recreates it. Browser observations are asynchronous; allow activity recording to finish before exporting. Backend purchase recording is already committed when checkout succeeds.

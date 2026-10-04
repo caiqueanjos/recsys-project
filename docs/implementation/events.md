@@ -1,6 +1,6 @@
 # Event contract and browser instrumentation
 
-Understand what an observation means, who records it, and how attribution survives retries. Runtime validation is in [contracts](../../packages/store-contracts/src/index.ts), causal checks in [Store.append](../../apps/store-api/src/db.ts), and browser recording in [main.tsx](../../apps/web/src/main.tsx).
+Understand what an observation means, who records it, and how attribution survives retries. Runtime validation is in [contracts](../../packages/store-contracts/src/index.ts), causal checks in [Store.append](../../apps/store-api/src/db.ts), and browser delivery in [telemetry.ts](../../apps/web/src/lib/telemetry.ts), card attribution in [ProductCard](../../apps/web/src/components/ProductCard.tsx), and route observations in [App](../../apps/web/src/App.tsx) and [ProductPage](../../apps/web/src/pages/ProductPage.tsx).
 
 ## Version 1 envelope
 

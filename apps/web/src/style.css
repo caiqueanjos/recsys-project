@@ -12,6 +12,7 @@ body {
   margin: 0;
 }
 button,
+a,
 input,
 select {
   font: inherit;
@@ -25,6 +26,7 @@ button:disabled {
   cursor: default;
 }
 button:focus-visible,
+a:focus-visible,
 input:focus-visible,
 select:focus-visible {
   outline: 3px solid #c77335;
@@ -33,6 +35,18 @@ select:focus-visible {
 button {
   border: 0;
   background: none;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+a.primary,
+a.back {
+  display: inline-block;
+}
+header > .wordmark,
+header .cart-button {
+  padding: 2px 6px;
 }
 h1,
 h2,
@@ -85,7 +99,7 @@ nav {
   display: flex;
   gap: 20px;
 }
-nav button {
+nav a {
   padding: 10px 0;
   font-size: 14px;
 }
@@ -225,7 +239,7 @@ main {
   border-bottom: 1px solid #dfdfd5;
   gap: 10px;
 }
-.category-strip button {
+.category-strip a {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -614,7 +628,7 @@ footer > span:last-child {
     justify-content: space-between;
     padding: 25px 0;
   }
-  .category-strip button {
+  .category-strip a {
     min-width: 73px;
   }
   .section-heading {

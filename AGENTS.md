@@ -13,7 +13,7 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 
 ## Architecture and ownership
 
-- `apps/web`: implemented React/Vite storefront with local-state navigation and a development proxy to the store API.
+- `apps/web`: implemented React/Vite storefront with React Router URL navigation and a development proxy to the store API.
 - `apps/store-api`: implemented Fastify/TypeScript backend using Node 24's built-in SQLite support for catalog, shoppers, sessions, carts, orders, and event ingestion.
 - `packages/store-contracts`: shared TypeScript types and Zod validation for the versioned live/synthetic event contract.
 - `tools/generate`: TypeScript catalog/history generation, immutable raw exports, optional delivery-quality simulation, and selective live-cart resets.

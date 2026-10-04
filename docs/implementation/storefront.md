@@ -1,6 +1,6 @@
 # Catalog and storefront features
 
-Trace browsing from the React UI to SQL. The implementation lives in [main.tsx](../../apps/web/src/main.tsx), [style.css](../../apps/web/src/style.css), and [server.ts](../../apps/store-api/src/server.ts).
+Trace browsing from the React UI to SQL. The entry point [main.tsx](../../apps/web/src/main.tsx) mounts React Router and the shared [StoreProvider](../../apps/web/src/state/StoreProvider.tsx). [App.tsx](../../apps/web/src/App.tsx) owns the layout and routes; page components live in `apps/web/src/pages`, reusable UI in `components`, and API/telemetry helpers in `lib`. Styling remains in [style.css](../../apps/web/src/style.css), with catalog endpoints in [server.ts](../../apps/store-api/src/server.ts).
 
 ## Implemented surfaces
 
@@ -12,7 +12,11 @@ Trace browsing from the React UI to SQL. The implementation lives in [main.tsx](
 | Cart | Shopper-specific quantities, removal, subtotal, fake checkout |
 | History | Shopper-specific orders with saved item prices and names |
 
-Navigation uses React state rather than a URL router. Reload returns to home and starts a session. Product details open from an already loaded card object; the API also supports direct product lookup, but the UI has no product deep-link route. Category art is a placeholder symbol, not a product-image pipeline.
+React Router uses browser history with routes `/`, `/catalog`, `/products/:productId`, `/cart`, and `/orders`. Links support Back/Forward and direct navigation. Catalog query parameters `q`, `category`, and `page` preserve submitted filters and pagination across refresh and history navigation; changing search or category resets pagination. Product details fetch `/products/:id`, including on direct entry, and show errors for missing products. Unknown routes show a page-not-found message. Reload preserves the URL and opens a new session; persona switching and manual session recovery return home. Category art is a placeholder symbol, not a product-image pipeline.
+
+The shared provider remains mounted across routes so navigation retains identity, session, cart, and checkout retry state. Page requests discard results after navigation or session changes. Route visits emit one session-activity observation, and successful product loads emit a product-view observation; returning to a product counts as another visit. Existing impression/click attribution stays in [ProductCard](../../apps/web/src/components/ProductCard.tsx). Event page labels retain `/home` and `/history` for those surfaces; product views and activity use `/products/:id`.
+
+A production host must serve `index.html` for frontend paths so direct links and refresh work, while routing `/api` to the store backend. Vite provides the SPA fallback during local development.
 
 ## Catalog query path
 

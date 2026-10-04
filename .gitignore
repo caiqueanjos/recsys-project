@@ -228,3 +228,6 @@ data/
 .env
 __pycache__/
 .venv/
+
+# Frontend source helpers are not Python distribution artifacts.
+!/apps/web/src/lib/

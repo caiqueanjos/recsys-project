@@ -1,6 +1,6 @@
 # Shopper identity and sessions
 
-Understand why a cart survives reload while a session does not. Identity/session behavior is implemented in [the frontend](../../apps/web/src/main.tsx) and [server routes](../../apps/store-api/src/server.ts).
+Understand why a cart survives reload while a session does not. Identity/session behavior is implemented in [StoreProvider](../../apps/web/src/state/StoreProvider.tsx) and [server routes](../../apps/store-api/src/server.ts).
 
 A shopper owns carts and purchase history. A session groups activity for that shopper. For example, Guest can add a kettle, switch to Sam and see an empty cart, then switch back to Guest and recover the kettle under a new session ID.
 
@@ -8,7 +8,7 @@ A shopper owns carts and purchase history. A session groups activity for that sh
 
 The browser saves the guest ID under `store.guest`. It remembers the selected identity under `store.active`; startup restores a selected seeded persona when possible, otherwise uses Guest. Missing guests are created with `POST /shoppers`. If a reset database no longer recognizes a persisted identity, a 404 from session creation triggers guest recreation.
 
-`POST /sessions` always creates a new live session. The API seeds three personas: Alex (`persona-home`), Sam (`persona-active`), and Jo (`persona-family`). Synthetic shoppers cannot open live sessions. A reload starts a session; switching identity also starts one, returns home, clears displayed orders/product state, loads that shopper's cart, and resets the checkout key. A generation counter prevents an earlier cart-mutation response from replacing the new identity's displayed cart.
+`POST /sessions` always creates a new live session. The API seeds three personas: Alex (`persona-home`), Sam (`persona-active`), and Jo (`persona-family`). Synthetic shoppers cannot open live sessions. A reload preserves the route and starts a session; switching identity also starts one, returns home, unmounts the previous page, loads that shopper's cart, and resets the checkout key. A generation counter prevents an earlier cart-mutation or checkout response from replacing the new identity's displayed cart.
 
 ## Session lifetime
 
