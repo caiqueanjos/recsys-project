@@ -22,7 +22,7 @@ These explanation/reference pages describe the current implementation rather tha
 - [Workspace setup tutorial](implementation/workspace-setup.md): create a similar scaffold from an empty directory.
 
 - [Store-to-export tutorial](implementation/walkthrough.md): a small isolated exercise with visible results.
-- [Local runbook](local-development.md): setup, command options, runtime prerequisites, ingestion, and reset procedures.
+- [Local development](local-development.md): run the store, generate data, ingest exports, run checks, and reset carts.
 - [Store contract v1](store-contract.md): concise endpoint and event semantics.
 - [Implementation plan](implementation-plan.md): agreed scope and completed scaffold stages.
 

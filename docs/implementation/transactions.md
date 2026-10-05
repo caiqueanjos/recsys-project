@@ -43,6 +43,6 @@ Idempotency means a repeated request has the same effect as the first request. T
 
 `GET /orders` returns the current shopper's orders newest first with saved item values. Fake checkout has no payment, shipping, tax, or stock-decrement integration.
 
-[reset-carts.ts](../../tools/generate/reset-carts.ts) clears only non-synthetic carts. It creates a live session per affected shopper and records a `cart_remove` for each item before clearing it, all in one transaction. Orders, identities, synthetic carts, and prior events remain. Use the [runbook](../local-development.md#validation-and-selective-resets) for the command.
+[reset-carts.ts](../../tools/generate/reset-carts.ts) clears only non-synthetic carts. It creates a live session per affected shopper and records a `cart_remove` for each item before clearing it, all in one transaction. Orders, identities, synthetic carts, and prior events remain. Use the [local development guide](../local-development.md#reset-carts-or-start-a-fresh-experiment) for the command.
 
 Related: [event contract](events.md) and [validation coverage](validation.md).

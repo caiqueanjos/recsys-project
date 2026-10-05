@@ -12,7 +12,7 @@ Use this reference to choose checks when changing a feature. These are existing 
 
 API tests use Fastify injection and in-memory SQLite. Browser validation seeds a temporary database, starts an ephemeral API and Vite on port 5175, launches Chromium, and cleans up its processes/database. It does not operate on your default learning store. Bronze tests use a temporary root and a real Spark session.
 
-Use the [runbook](../local-development.md#validation-and-selective-resets) for prerequisites and invocation, including browser installation and the Bronze working directory. Documentation-only edits do not require application builds. The formatting script does not include Markdown.
+Use the [local development guide](../local-development.md#run-validation) for prerequisites and invocation, including browser installation and the Bronze working directory. Documentation-only edits do not require application builds. The formatting script does not include Markdown.
 
 ## What passing checks does not establish
 
