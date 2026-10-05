@@ -27,3 +27,10 @@ These explanation/reference pages describe the current implementation rather tha
 - [Implementation plan](implementation-plan.md): agreed scope and completed scaffold stages.
 
 The store and raw ingestion scaffold are implemented. The Python recommendation projects remain user-owned placeholders; Silver/Gold, model development, retrieval, ranking, evaluation, and serving are not implemented here.
+
+## Proposed Databricks development
+
+- [Developing locally and deploying to Databricks](databricks-development.md): proposed milestones, portability boundaries, remote Bronze changes, infrastructure as code, and CI/CD.
+- [Databricks architecture reference](databricks-architecture.md): the reference architecture behind the proposal.
+
+This roadmap describes future work. No Databricks resources or recommendation-platform implementation have been added.
