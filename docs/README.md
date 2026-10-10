@@ -1,6 +1,6 @@
 # Project documentation
 
-Current implementation guide, verified against the source on October 4, 2026. Start with the scaffold and follow the reading order to understand each implemented feature. Familiarity with TypeScript, HTTP, SQL transactions, and basic event pipelines is useful; Spark is needed only for running Bronze ingestion.
+Current implementation guide, verified against the source on October 10, 2026. Start with the scaffold and follow the reading order to understand each implemented feature. Familiarity with TypeScript, HTTP, SQL transactions, and basic event pipelines is useful; Spark is needed only for running Bronze ingestion.
 
 ## Implementation reading order
 

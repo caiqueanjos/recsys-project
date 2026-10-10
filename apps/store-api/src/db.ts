@@ -1,89 +1,138 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { Pool, types, type PoolClient } from 'pg';
 import { eventSchema, type Product, type StoreEvent, type Order } from '@store/contracts';
+import { schema } from './schema.js';
 
+export const defaultDatabaseUrl = 'postgresql://store:store@127.0.0.1:5432/store';
+// Counts and event sequences are consumed as JSON numbers. Reject precision loss.
+types.setTypeParser(20, (value) => {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number)) throw new Error('Database integer exceeds safe JSON range');
+  return number;
+});
 export class Store {
-  db: DatabaseSync;
-  constructor(path = process.env.STORE_DB ?? 'data/store.sqlite') {
-    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
-    this.db = new DatabaseSync(path);
-    this.db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
-      CREATE TABLE IF NOT EXISTS products(id TEXT PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, subcategory TEXT NOT NULL, brand TEXT NOT NULL, description TEXT NOT NULL, priceCents INTEGER NOT NULL CHECK(priceCents>0), available INTEGER NOT NULL, listedAt TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS trending(position INTEGER PRIMARY KEY, productId TEXT NOT NULL REFERENCES products(id));
-      CREATE TABLE IF NOT EXISTS shoppers(id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, createdAt TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY, shopperId TEXT NOT NULL REFERENCES shoppers(id), startedAt TEXT NOT NULL, lastActiveAt TEXT NOT NULL, source TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS carts(shopperId TEXT NOT NULL REFERENCES shoppers(id), productId TEXT NOT NULL REFERENCES products(id), quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 99), PRIMARY KEY(shopperId,productId));
-      CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY, shopperId TEXT NOT NULL REFERENCES shoppers(id), sessionId TEXT NOT NULL REFERENCES sessions(id), createdAt TEXT NOT NULL, totalCents INTEGER NOT NULL, idempotencyKey TEXT NOT NULL, UNIQUE(sessionId,idempotencyKey));
-      CREATE TABLE IF NOT EXISTS order_items(orderId TEXT NOT NULL REFERENCES orders(id), productId TEXT NOT NULL REFERENCES products(id), name TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>0), unitPriceCents INTEGER NOT NULL, PRIMARY KEY(orderId,productId));
-      CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, type TEXT NOT NULL, occurredAt TEXT NOT NULL, ingestedAt TEXT NOT NULL, shopperId TEXT NOT NULL REFERENCES shoppers(id), sessionId TEXT NOT NULL REFERENCES sessions(id), source TEXT NOT NULL, payload TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS events_session ON events(sessionId);
-      CREATE INDEX IF NOT EXISTS orders_shopper ON orders(shopperId);
-      CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS generation_runs(id TEXT PRIMARY KEY, manifest TEXT NOT NULL);
-      CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'Events are append-only'); END;
-      CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events BEGIN SELECT RAISE(ABORT,'Events are append-only'); END;`);
-    this.db.prepare('INSERT OR IGNORE INTO metadata VALUES(?,?)').run('sourceId', randomUUID());
+  private readonly context = new AsyncLocalStorage<PoolClient>();
+  private readonly pool: Pool;
+  readonly db;
+  private constructor(url: string, namespace: string) {
+    if (!/^postgres(ql)?:\/\//.test(url)) throw new Error('Use a PostgreSQL connection URL');
+    if (!/^[a-z][a-z0-9_]*$/.test(namespace)) throw new Error('Invalid database schema');
+    this.pool = new Pool({
+      connectionString: url,
+      options: `-c search_path=${namespace}`,
+      connectionTimeoutMillis: 5000,
+    });
+    this.pool.on('error', (error) =>
+      console.error('Idle PostgreSQL connection error:', error.message),
+    );
+    this.db = {
+      prepare: (sql: string) => ({
+        get: async (...params: unknown[]) =>
+          (await this.query(sql, params)).rows[0] as Record<string, any> | undefined,
+        all: async (...params: unknown[]) =>
+          (await this.query(sql, params)).rows as Record<string, any>[],
+        run: async (...params: unknown[]) => {
+          await this.query(sql, params);
+        },
+      }),
+      exec: async (sql: string) => {
+        await this.query(sql);
+      },
+      close: () => this.pool.end(),
+    };
   }
-  transaction<T>(fn: () => T): T {
-    this.db.exec('BEGIN IMMEDIATE');
+  static async open(
+    url = process.env.STORE_DATABASE_URL ?? defaultDatabaseUrl,
+    namespace = 'public',
+  ) {
+    const store = new Store(url, namespace);
     try {
-      const result = fn();
-      this.db.exec('COMMIT');
-      return result;
+      await store.transaction(async () => {
+        await store.db.exec(schema);
+        await store.db
+          .prepare('INSERT INTO metadata VALUES($1,$2) ON CONFLICT DO NOTHING')
+          .run('sourceId', randomUUID());
+      });
+      return store;
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      await store.db.close();
       throw error;
     }
   }
-  product(id: string): Product | undefined {
-    const row = this.db.prepare('SELECT * FROM products WHERE id=?').get(id);
+  private query(sql: string, params: unknown[] = []) {
+    return (this.context.getStore() ?? this.pool).query(sql, params);
+  }
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.context.getStore()) return fn();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Serialize store mutations and snapshots, including across API processes.
+      // A transactional event counter avoids sequence holes after rollbacks.
+      await client.query('SELECT pg_advisory_xact_lock(731024, hashtext(current_schema()))');
+      const result = await this.context.run(client, fn);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  async product(id: string): Promise<Product | undefined> {
+    const row = await this.db.prepare('SELECT * FROM products WHERE id=$1').get(id);
     return row ? ({ ...row, available: Boolean(row.available) } as Product) : undefined;
   }
-  cart(shopperId: string) {
-    return (
-      this.db
-        .prepare('SELECT productId,quantity FROM carts WHERE shopperId=? ORDER BY productId')
-        .all(shopperId) as { productId: string; quantity: number }[]
-    ).map((row) => ({ product: this.product(row.productId)!, quantity: row.quantity }));
+  async cart(shopperId: string) {
+    const rows = await this.db
+      .prepare(
+        'SELECT p.*, c.quantity FROM carts c JOIN products p ON p.id=c."productId" WHERE c."shopperId"=$1 ORDER BY p.id',
+      )
+      .all(shopperId);
+    return rows.map(({ quantity, ...product }) => ({
+      product: { ...product, available: Boolean(product.available) } as Product,
+      quantity: Number(quantity),
+    }));
   }
-  order(id: string): Order {
-    const row = this.db
-      .prepare('SELECT id,shopperId,sessionId,createdAt,totalCents FROM orders WHERE id=?')
-      .get(id)!;
+  async order(id: string): Promise<Order> {
+    const row = (await this.db
+      .prepare('SELECT id,"shopperId","sessionId","createdAt","totalCents" FROM orders WHERE id=$1')
+      .get(id))!;
     return {
       ...row,
-      items: this.db
+      items: await this.db
         .prepare(
-          'SELECT productId,name,quantity,unitPriceCents FROM order_items WHERE orderId=? ORDER BY productId',
+          'SELECT "productId",name,quantity,"unitPriceCents" FROM order_items WHERE "orderId"=$1 ORDER BY "productId"',
         )
         .all(id),
     } as Order;
   }
-  append(input: StoreEvent): void {
+  async append(input: StoreEvent): Promise<void> {
+    if (!this.context.getStore()) return this.transaction(() => this.append(input));
     const event = eventSchema.parse(input);
-    const existing = this.db.prepare('SELECT payload FROM events WHERE id=?').get(event.id);
+    const existing = await this.db.prepare('SELECT payload FROM events WHERE id=$1').get(event.id);
     if (existing) {
       const previous = JSON.parse(String(existing.payload));
       if (JSON.stringify({ ...previous, ingestedAt: event.ingestedAt }) !== JSON.stringify(event))
         throw new Error('Event ID conflicts with existing payload');
       return;
     }
-    const session = this.db
-      .prepare('SELECT shopperId,startedAt FROM sessions WHERE id=?')
+    const session = await this.db
+      .prepare('SELECT "shopperId","startedAt" FROM sessions WHERE id=$1')
       .get(event.sessionId);
     if (!session || session.shopperId !== event.shopperId)
       throw new Error('Invalid event identity');
     if (event.occurredAt < String(session.startedAt)) throw new Error('Event precedes session');
     if (event.context.productId) {
-      const product = this.product(event.context.productId);
+      const product = await this.product(event.context.productId);
       if (!product || product.listedAt > event.occurredAt)
         throw new Error('Product not listed at event time');
     }
     if (event.type === 'click') {
-      const row = this.db
-        .prepare('SELECT payload FROM events WHERE id=?')
+      const row = await this.db
+        .prepare('SELECT payload FROM events WHERE id=$1')
         .get(event.context.impressionId!);
       const impression = row ? (JSON.parse(String(row.payload)) as StoreEvent) : undefined;
       if (
@@ -98,15 +147,16 @@ export class Store {
         throw new Error('Click has no matching prior impression');
     }
     if (event.type === 'purchase') {
-      const order = this.db
-        .prepare('SELECT sessionId,createdAt FROM orders WHERE id=?')
+      const order = await this.db
+        .prepare('SELECT "sessionId","createdAt" FROM orders WHERE id=$1')
         .get(event.context.orderId!);
       if (!order || order.sessionId !== event.sessionId || order.createdAt !== event.occurredAt)
         throw new Error('Purchase must match order');
     }
-    this.db
+    await this.db.exec('UPDATE event_counter SET value=value+1 WHERE id=1');
+    await this.db
       .prepare(
-        'INSERT INTO events(id,type,occurredAt,ingestedAt,shopperId,sessionId,source,payload) VALUES(?,?,?,?,?,?,?,?)',
+        'INSERT INTO events(seq,id,type,"occurredAt","ingestedAt","shopperId","sessionId",source,payload) SELECT value,$1,$2,$3,$4,$5,$6,$7,$8 FROM event_counter WHERE id=1',
       )
       .run(
         event.id,
@@ -119,14 +169,17 @@ export class Store {
         JSON.stringify(event),
       );
   }
-  event(
-    session: { id: string; shopperId: string },
+  async event(
+    session: {
+      id: string;
+      shopperId: string;
+    },
     type: StoreEvent['type'],
     context: StoreEvent['context'],
     time = new Date().toISOString(),
     source: StoreEvent['source'] = 'store_backend',
   ) {
-    this.append({
+    await this.append({
       schemaVersion: 1,
       id: randomUUID(),
       type,
@@ -138,14 +191,14 @@ export class Store {
       context,
     });
   }
-  seedPersonas() {
+  async seedPersonas() {
     for (const [id, name] of [
       ['persona-home', 'Alex · home projects'],
       ['persona-active', 'Sam · active days'],
       ['persona-family', 'Jo · family essentials'],
     ]) {
-      this.db
-        .prepare('INSERT OR IGNORE INTO shoppers VALUES(?,?,?,?)')
+      await this.db
+        .prepare('INSERT INTO shoppers VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING')
         .run(id, name, 'persona', '2025-01-01T00:00:00.000Z');
     }
   }

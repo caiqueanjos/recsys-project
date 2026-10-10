@@ -194,7 +194,6 @@ Retain Vite's generated ignore rules. Add a root `.gitignore` for workspace-wide
 node_modules/
 dist/
 data/
-*.sqlite*
 .venv/
 __pycache__/
 .env

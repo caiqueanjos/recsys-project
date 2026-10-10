@@ -15,7 +15,7 @@ Adapt its boundaries locally rather than duplicating every managed service:
 | Responsibility | Initial local implementation | Future/user-owned work |
 | --- | --- | --- |
 | Store application | React/Vite + TypeScript store API | Store integration with recommendation API |
-| Store persistence | One SQLite database | PostgreSQL in Docker |
+| Store persistence | PostgreSQL in Docker with persistent volume | Further operational changes as needed |
 | Offline ingestion | Incremental store event/catalog ingestion | Streaming or Databricks ingestion |
 | Bronze | Local Delta tables using Spark/Delta | Databricks-backed tables |
 | Silver/Gold | Not implemented by scaffold | Cleaning, sessionization, features, training datasets |
@@ -36,7 +36,7 @@ The store database and analytical storage have different roles. Historical event
 - Each identity retains its cart and purchase history; switching personas starts a new session.
 - Successful fake checkout creates an order, records a purchase, and clears that identity's cart.
 - No real authentication, payment processing, or shipping integration in the MVP.
-- One SQLite database with separate catalog, shopper, cart, order, session, and event tables.
+- One PostgreSQL database with separate catalog, shopper, cart, order, session, and event tables.
 
 ## Event contract and recording
 
@@ -76,7 +76,7 @@ Introduce users and products after chronological training cutoffs to create eval
 ## Implementation stages
 
 1. Define operational schemas, event contract, identity/session behavior, and ingestion boundaries.
-2. Build the TypeScript store API with SQLite persistence and transactional checkout.
+2. Build the TypeScript store API with PostgreSQL persistence and transactional checkout.
 3. Build the storefront, persona switching, instrumentation, and fixed trending list.
 4. Add reproducible catalog/history generation using the same contracts and consistent store records.
 5. Add local Bronze Delta ingestion and run documentation.
@@ -93,10 +93,14 @@ Validation should cover cart isolation/persistence, session changes, order/event
 
 ## Implementation decisions
 
-- npm workspaces, Fastify, Node 24 built-in SQLite, React/Vite, CSS, Node tests, and Playwright browser checks; no ORM.
+- npm workspaces, Fastify, Node 24 and node-postgres, React/Vite, CSS, Node tests, and Playwright browser checks; no ORM.
 - Persistent localStorage guest identity; persona switches/reloads start sessions; 30-minute inactivity expiry. Endpoint/event schemas are documented in [store contract](store-contract.md).
 - Configurable seeded simulation, 15% time-based cold entities, 5% reserved unobserved entities, 10% sparse shoppers, separate optional delivery-quality artifacts. Latent diagnostics are excluded from operational/Bronze inputs.
 - TypeScript generation/export tooling in `tools/generate`; the user explicitly approved standalone Python ingestion in `tools/bronze`, separate from the reserved recommendation projects.
 - Python 3.12, Spark 4.0.1, Delta 4.0.0, JDK 17/21; manual immutable exports and replay-safe local ingestion.
 
-Validation completed: API/history tests, desktop/mobile browser flows, production build, full proposed generation scale (10k products/20k shoppers/~1m events), actual SQLite-to-Delta ingestion, and failure/replay tests. Details and constraints are in the runbook.
+Historical scaffold validation completed before PostgreSQL: API/history tests, desktop/mobile browser flows, production build, full proposed generation scale (10k products/20k shoppers/~1m events), raw exports into Delta, and failure/replay tests. Details and constraints are in the runbook.
+
+## PostgreSQL persistence (October 10, 2026)
+
+The store API, generation, export/reset commands, and validation use async PostgreSQL connections. Docker Compose supplies PostgreSQL 18 and a persistent named volume. Transaction-scoped advisory locking and a transactional counter preserve checkout retries and contiguous Bronze cursors. PostgreSQL scale has not been benchmarked. See the [runbook](local-development.md) for startup and generation commands.

@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Store } from '../src/db.js';
+import { temporaryStore } from '../../../tools/validate/database.js';
 import { buildServer } from '../src/server.js';
 
-test('identity isolation, transactional checkout, replay, and exposure validation', async () => {
-  const store = new Store(':memory:');
-  store.db
-    .prepare('INSERT INTO products VALUES(?,?,?,?,?,?,?,?,?)')
+test('identity isolation, transactional checkout, replay, and exposure validation', async (t) => {
+  const fixture = await temporaryStore();
+  t.after(() => fixture.cleanup());
+  const { store } = fixture;
+  await store.db
+    .prepare('INSERT INTO products VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)')
     .run(
       'p1',
       'Kettle',
@@ -18,7 +20,7 @@ test('identity isolation, transactional checkout, replay, and exposure validatio
       1,
       '2025-01-01T00:00:00.000Z',
     );
-  const app = buildServer(store);
+  const app = await buildServer(store);
   const call = async (
     method: 'GET' | 'POST' | 'PUT',
     url: string,
@@ -41,7 +43,7 @@ test('identity isolation, transactional checkout, replay, and exposure validatio
   assert.deepEqual((await call('GET', '/cart', undefined, next.id)).json(), []);
   assert.equal((await call('GET', '/orders', undefined, a.id)).json().length, 1);
   assert.equal(
-    store.db.prepare("SELECT count(*) AS n FROM events WHERE type='purchase'").get()!.n,
+    (await store.db.prepare("SELECT count(*) AS n FROM events WHERE type='purchase'").get())!.n,
     1,
   );
   const now = new Date().toISOString();
@@ -78,7 +80,7 @@ test('identity isolation, transactional checkout, replay, and exposure validatio
   assert.equal((await call('POST', '/events', { events }, next.id)).statusCode, 200);
   assert.equal((await call('POST', '/events', { events }, next.id)).statusCode, 200);
   assert.equal(
-    store.db.prepare("SELECT count(*) AS n FROM events WHERE source='browser'").get()!.n,
+    (await store.db.prepare("SELECT count(*) AS n FROM events WHERE source='browser'").get())!.n,
     2,
   );
   assert.equal(
@@ -107,27 +109,27 @@ test('identity isolation, transactional checkout, replay, and exposure validatio
     ).statusCode,
     400,
   );
-  assert.throws(() => store.db.exec('DELETE FROM events'), /append-only/);
-  store.db
-    .prepare("UPDATE sessions SET lastActiveAt='2025-01-01T00:00:00.000Z' WHERE id=?")
+  await assert.rejects(() => store.db.exec('DELETE FROM events'), /append-only/);
+  await store.db
+    .prepare('UPDATE sessions SET "lastActiveAt"=\'2025-01-01T00:00:00.000Z\' WHERE id=$1')
     .run(a.id);
   assert.equal((await call('GET', '/cart', undefined, a.id)).statusCode, 401);
   await app.close();
-  store.db.close();
 });
-
-test('checkout failure leaves cart and events intact', async () => {
-  const store = new Store(':memory:'),
-    app = buildServer(store);
-  store.db
-    .prepare('INSERT INTO products VALUES(?,?,?,?,?,?,?,?,?)')
+test('checkout failure leaves cart and events intact', async (t) => {
+  const fixture = await temporaryStore();
+  t.after(() => fixture.cleanup());
+  const { store } = fixture;
+  const app = await buildServer(store);
+  await store.db
+    .prepare('INSERT INTO products VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)')
     .run('p', 'Soap', 'Personal Care', 'Bath', 'Pure', 'Soap', 500, 1, '2025-01-01T00:00:00.000Z');
   const s = (
     await app.inject({ method: 'POST', url: '/sessions', payload: { shopperId: 'persona-home' } })
   ).json();
   const headers = { 'x-session-id': s.id };
   await app.inject({ method: 'PUT', url: '/cart/p', headers, payload: { quantity: 1 } });
-  store.db.exec('UPDATE products SET available=0');
+  await store.db.exec('UPDATE products SET available=0');
   assert.equal(
     (
       await app.inject({
@@ -139,12 +141,81 @@ test('checkout failure leaves cart and events intact', async () => {
     ).statusCode,
     409,
   );
-  assert.equal(store.cart('persona-home').length, 1);
-  assert.equal(store.db.prepare('SELECT count(*) AS n FROM orders').get()!.n, 0);
+  assert.equal((await store.cart('persona-home')).length, 1);
+  assert.equal((await store.db.prepare('SELECT count(*) AS n FROM orders').get())!.n, 0);
   assert.equal(
-    store.db.prepare("SELECT count(*) AS n FROM events WHERE type='purchase'").get()!.n,
+    (await store.db.prepare("SELECT count(*) AS n FROM events WHERE type='purchase'").get())!.n,
     0,
   );
   await app.close();
-  store.db.close();
+});
+
+test('concurrent checkout retries commit one purchase and failed event batches leave no sequence gaps', async (t) => {
+  const fixture = await temporaryStore();
+  t.after(() => fixture.cleanup());
+  const { store } = fixture;
+  const app = await buildServer(store);
+  t.after(() => app.close());
+  await store.db
+    .prepare('INSERT INTO products VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)')
+    .run('p', 'Soap', 'Personal Care', 'Bath', 'Pure', 'Soap', 500, 1, '2025-01-01T00:00:00.000Z');
+  const session = (
+    await app.inject({ method: 'POST', url: '/sessions', payload: { shopperId: 'persona-home' } })
+  ).json();
+  const headers = { 'x-session-id': session.id };
+  await app.inject({ method: 'PUT', url: '/cart/p', headers, payload: { quantity: 1 } });
+  const retries = await Promise.all(
+    Array.from({ length: 5 }, () =>
+      app.inject({
+        method: 'POST',
+        url: '/checkout',
+        headers,
+        payload: { idempotencyKey: 'concurrent' },
+      }),
+    ),
+  );
+  for (const response of retries) {
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), retries[0].json());
+  }
+  assert.equal((await store.db.prepare('SELECT count(*) AS n FROM orders').get())!.n, 1);
+  const now = new Date().toISOString();
+  const event = {
+    id: 'rolled-back',
+    type: 'session_activity',
+    occurredAt: now,
+    context: { page: '/home' },
+  };
+  const failure = await app.inject({
+    method: 'POST',
+    url: '/events',
+    headers,
+    payload: {
+      events: [
+        event,
+        {
+          id: 'invalid-click',
+          type: 'click',
+          occurredAt: now,
+          context: { productId: 'p', surface: 'catalog', position: 1, impressionId: 'missing' },
+        },
+      ],
+    },
+  });
+  assert.equal(failure.statusCode, 400);
+  assert.equal(
+    await store.db.prepare('SELECT id FROM events WHERE id=$1').get(event.id),
+    undefined,
+  );
+  assert.equal(
+    (await app.inject({ method: 'POST', url: '/events', headers, payload: { events: [event] } }))
+      .statusCode,
+    200,
+  );
+  assert.deepEqual(
+    (await store.db.prepare('SELECT seq FROM events ORDER BY seq').all()).map((row) => row.seq),
+    [1, 2, 3],
+  );
+  for (const sql of ['UPDATE events SET payload=payload', 'DELETE FROM events', 'TRUNCATE events'])
+    await assert.rejects(() => store.db.exec(sql), /append-only/);
 });

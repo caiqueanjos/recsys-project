@@ -35,7 +35,7 @@ flowchart LR
 
 **Path B** assembles candidates and scores them using context supplied in the request, such as recent product views, searches, and cart contents. It does not wait for the same actions to arrive in Bronze. It can fall back to Path A or the existing fixed trending list.
 
-SQLite remains the store's operational database. Analytical tables and recommendation-owned online storage have separate responsibilities. Introducing an online recommendation database does not require migrating store transactions at the same time.
+PostgreSQL remains the store's operational database. Analytical tables and recommendation-owned online storage have separate responsibilities. Introducing an online recommendation database does not require migrating store transactions at the same time.
 
 ## Map responsibilities between environments
 
@@ -43,7 +43,7 @@ These mappings describe possible implementations, not equivalent performance or 
 
 | Responsibility | Local implementation | Databricks target |
 | --- | --- | --- |
-| Store UI and operational API | Existing React/Fastify apps and SQLite | Can remain outside Databricks |
+| Store UI and operational API | Existing React/Fastify apps and PostgreSQL | Can remain outside Databricks |
 | Event ingestion | Existing immutable exports | Uploaded exports first; Zerobus later |
 | Raw analytical data | Existing local Spark/Delta Bronze | Unity Catalog Delta tables |
 | Transformations and batch jobs | Python modules with local Spark | Scheduled Databricks jobs; managed pipelines where useful |

@@ -5,7 +5,7 @@ Understand how a storefront action becomes operational state and then raw analyt
 ```mermaid
 flowchart LR
     W[React storefront] -->|HTTP via Vite development proxy| A[Fastify store API]
-    A --> S[(SQLite operations and events)]
+    A --> S[(PostgreSQL operations and events)]
     G[Seeded history generator] --> S
     S --> E[Immutable NDJSON export]
     E --> B[Spark ingestion]
@@ -14,9 +14,9 @@ flowchart LR
     S --> Q[Optional delivery experiment]
 ```
 
-SQLite owns current carts, catalog, identities, sessions, immutable order records, and the event log. A successful cart mutation or checkout writes its operational changes and event in one SQLite transaction. Browser observations arrive separately and can fail independently of a successful purchase.
+PostgreSQL owns current carts, catalog, identities, sessions, immutable order records, and the event log. A successful cart mutation or checkout writes its operational changes and event in one PostgreSQL transaction. Browser observations arrive separately and can fail independently of a successful purchase.
 
-The exporter takes a consistent SQLite transaction and publishes files with provenance and checksums. Bronze preserves those raw envelopes in Delta and advances a durable cursor after both table writes. Delta is the analytical landing layer; it does not serve the storefront.
+The exporter takes a consistent PostgreSQL transaction and publishes files with provenance and checksums. Bronze preserves those raw envelopes in Delta and advances a durable cursor after both table writes. Delta is the analytical landing layer; it does not serve the storefront.
 
 ## One action through the system
 

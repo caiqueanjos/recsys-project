@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: store
+      POSTGRES_PASSWORD: store
+      POSTGRES_DB: store
+    ports:
+      - "127.0.0.1:${STORE_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - store-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U store -d store"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  store-postgres:

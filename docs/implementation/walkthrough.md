@@ -1,14 +1,16 @@
 # Tutorial: follow a store interaction into an export
 
-Observe identity persistence, transactional events, and the raw export using an isolated learning database. Run commands from the repository root with Node 24 and installed npm dependencies. This exercise does not require Spark and does not modify `data/store.sqlite`.
+Observe identity persistence, transactional events, and the raw export using an isolated learning database. Run commands from the repository root with Node 24, Docker Compose, and installed npm dependencies. This exercise does not require Spark and uses a separate PostgreSQL database.
 
 ## 1. Create a small catalog and history
 
-Choose fresh paths if you have already completed this exercise:
+Choose a fresh database name and export path if you have already completed this exercise:
 
 ```sh
 npm ci
-npm run seed -- --db data/docs-demo.sqlite --products 140 --shoppers 80 --events 1000 --seed 17 --start 2026-07-01T00:00:00.000Z --days 10
+npm run db:up
+docker compose exec postgres createdb -U store docs_demo
+npm run seed -- --db postgresql://store:store@127.0.0.1:5432/docs_demo --products 140 --shoppers 80 --events 1000 --seed 17 --start 2026-07-01T00:00:00.000Z --days 10
 ```
 
 The summary reports run, events, sessions, and orders. Expect at least the requested event count because generation finishes its last session. The historical window must end in the past.
@@ -18,7 +20,7 @@ The summary reports run, events, sessions, and orders. Expect at least the reque
 In one terminal:
 
 ```sh
-STORE_DB=data/docs-demo.sqlite npm run dev:api
+STORE_DATABASE_URL=postgresql://store:store@127.0.0.1:5432/docs_demo npm run dev:api
 ```
 
 In another:
@@ -43,7 +45,7 @@ If the localStorage guest belongs to another database, startup recreates it. Bro
 While the API is using that database, export from another terminal:
 
 ```sh
-npm run export:bronze -- --db data/docs-demo.sqlite --output data/exports/docs-demo
+npm run export:bronze -- --db postgresql://store:store@127.0.0.1:5432/docs_demo --output data/exports/docs-demo
 ```
 
 Open `manifest.json`, `events.ndjson`, and `catalog.ndjson` under `data/exports/docs-demo`. The manifest names the database source, high-water sequence, snapshot, counts, and checksums. Event payloads include earlier synthetic activity and the new browser/backend activity; the purchase source is `store_backend`, while the impression/click source is `browser`.

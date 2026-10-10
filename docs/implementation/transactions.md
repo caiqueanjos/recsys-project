@@ -21,9 +21,9 @@ The event quantity is the resulting total, not a delta. A request setting quanti
 sequenceDiagram
     participant UI as Storefront
     participant API as Store API
-    participant DB as SQLite
+    participant DB as PostgreSQL
     UI->>API: POST /checkout (session, key)
-    API->>DB: BEGIN IMMEDIATE
+    API->>DB: BEGIN; acquire transaction advisory lock
     API->>DB: Look up prior order for session + key
     alt Prior order exists
         DB-->>API: Original order
@@ -35,7 +35,7 @@ sequenceDiagram
     API-->>UI: Order
 ```
 
-The backend rejects an empty cart or unavailable cart items with 409. It snapshots item names/prices, calculates the total, appends a purchase at the order's exact timestamp, and clears the cart. Exceptions roll back all those writes. Checkout does not emit separate removal events for the cart it consumes.
+The backend rejects an empty cart or unavailable cart items with 409. It snapshots item names/prices, calculates the total, appends a purchase at the order's exact timestamp, and clears the cart. Exceptions roll back all those writes and the event counter. A schema-scoped advisory lock serializes concurrent retries before they look up the prior order, so only one checkout creates a purchase. Checkout does not emit separate removal events for the cart it consumes.
 
 Idempotency means a repeated request has the same effect as the first request. The unique `(sessionId, idempotencyKey)` pair returns the original order, even after that checkout cleared the cart. The same key in another session is a different operation. The UI keeps its key across a failed request; it clears the key after success, a successful cart mutation, or identity switching. A reload starts a new session, so this is not a cross-session retry guarantee.
 

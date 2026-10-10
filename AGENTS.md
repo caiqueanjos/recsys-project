@@ -14,12 +14,12 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 ## Architecture and ownership
 
 - `apps/web`: implemented React/Vite storefront with React Router URL navigation and a development proxy to the store API.
-- `apps/store-api`: implemented Fastify/TypeScript backend using Node 24's built-in SQLite support for catalog, shoppers, sessions, carts, orders, and event ingestion.
+- `apps/store-api`: implemented Fastify/TypeScript backend using PostgreSQL in Docker for catalog, shoppers, sessions, carts, orders, and event ingestion.
 - `packages/store-contracts`: shared TypeScript types and Zod validation for the versioned live/synthetic event contract.
 - `tools/generate`: TypeScript catalog/history generation, immutable raw exports, optional delivery-quality simulation, and selective live-cart resets.
 - `tools/validate`: Playwright browser regression checks using an isolated temporary store.
 - `tools/bronze`: explicitly approved standalone Python 3.12 project using Spark 4.0.1 and Delta 4.0.0; separate from the user's Python recommendation projects.
-- One SQLite database initially owns store operational data and event records. PostgreSQL in Docker is a later migration goal.
+- One PostgreSQL database in Docker owns store operational data and event records, with a persistent named volume.
 - `apps/api` and `packages/recommender`: user-owned Python recommendation platform, not the store backend.
 - Local Bronze Delta ingestion is in scaffolding scope. Silver/Gold pipelines, embeddings, training, candidate retrieval, ranking, evaluation, and recommendation serving belong to the user.
 
@@ -41,7 +41,7 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 ## Local workflow and validation
 
 - Use npm workspaces and Node 24 for store development; keep the existing Python recommendation workspace independent.
-- See `docs/local-development.md` for setup, runtime prerequisites, generation, exports, ingestion, and selective resets. Default SQLite path: `data/store.sqlite`; generated data and runtime artifacts are ignored by Git.
+- See `docs/local-development.md` for setup, runtime prerequisites, generation, exports, ingestion, and selective resets. Default PostgreSQL URL: `postgresql://store:store@127.0.0.1:5432/store`; generated data and runtime artifacts are ignored by Git.
 - Store commands: `npm run dev:api`, `npm run dev:web`, `npm run seed`, `npm run export:bronze`, and `npm run reset:carts`.
 - Run checks appropriate to the change: `npm test` for API/history contracts, `npm run test:browser` for storefront flows, `npm run build` for TypeScript and production assets, and `npm run format:check` for formatting. Chromium and its system dependencies are needed for browser checks.
 - For ingestion changes, run `uv run python -m unittest discover -s tests -v` from `tools/bronze`. Spark requires JDK 17/21, local JVM sockets, and first-run Maven downloads.
@@ -53,4 +53,4 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 
 Use `docs/README.md` as the documentation index for current implementation explanations and feature references. Follow `docs/implementation-plan.md` for agreed scope and implementation decisions; all six scaffold stages are implemented. Use `docs/store-contract.md` for endpoint/event semantics and `docs/local-development.md` for runnable workflows. The architectural reference is https://www.databricks.com/blog/real-time-retail-intelligence-building-e-commerce-recommendations-lakebase-and-ai-search.
 
-Preserve the distinction between offline event ingestion and direct session context in future online recommendation requests. SQLite is the store database, not the analytical lakehouse or recommendation feature store.
+Preserve the distinction between offline event ingestion and direct session context in future online recommendation requests. PostgreSQL is the store database, not the analytical lakehouse or recommendation feature store.

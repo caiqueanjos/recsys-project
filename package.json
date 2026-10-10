@@ -17,10 +17,13 @@
     "reset:carts": "node --import tsx tools/generate/reset-carts.ts",
     "format": "prettier --write \"apps/store-api/**/*.ts\" \"apps/web/**/*.{ts,tsx,css}\" \"packages/store-contracts/**/*.ts\" \"tools/{generate,validate}/**/*.ts\"",
     "format:check": "prettier --check \"apps/store-api/**/*.ts\" \"apps/web/**/*.{ts,tsx,css}\" \"packages/store-contracts/**/*.ts\" \"tools/{generate,validate}/**/*.ts\"",
-    "test:browser": "node --import tsx tools/validate/browser.ts"
+    "test:browser": "node --import tsx tools/validate/browser.ts",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
     "playwright": "^1.63.0",
     "prettier": "^3.9.9",
     "tsx": "^4.20.0",

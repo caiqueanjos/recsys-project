@@ -1,10 +1,10 @@
 # Immutable exports and local Bronze ingestion
 
-Understand the replay and recovery protocol between SQLite and raw Delta tables. Export code is [export.ts](../../tools/generate/export.ts); ingestion is [ingest.py](../../tools/bronze/ingest.py). Bronze means a raw analytical landing layer, preserving source data rather than producing model features.
+Understand the replay and recovery protocol between PostgreSQL and raw Delta tables. Export code is [export.ts](../../tools/generate/export.ts); ingestion is [ingest.py](../../tools/bronze/ingest.py). Bronze means a raw analytical landing layer, preserving source data rather than producing model features.
 
 ## Export protocol
 
-The exporter captures the event high-water sequence and catalog within one SQLite transaction. It writes a temporary sibling directory, calculates line counts and SHA-256 digests, writes `manifest.json`, then renames the directory to the requested destination. Existing output paths are rejected. A failed export can leave a partial directory; it is not a completed batch.
+The exporter captures the event high-water sequence and catalog within one PostgreSQL transaction. It writes a temporary sibling directory, calculates line counts and SHA-256 digests, writes `manifest.json`, then renames the directory to the requested destination. Existing output paths are rejected. A failed export can leave a partial directory; it is not a completed batch.
 
 | Artifact | Fields |
 | --- | --- |

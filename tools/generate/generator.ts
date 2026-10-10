@@ -102,7 +102,11 @@ function random(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-export function generate(store: Store, config: Config) {
+export async function generate(store: Store, config: Config) {
+  return store.transaction(() => generateHistory(store, config));
+}
+
+async function generateHistory(store: Store, config: Config) {
   for (const key of ['products', 'shoppers', 'events', 'days'] as const)
     if (!Number.isSafeInteger(config[key]) || config[key] < 1)
       throw new Error(`${key} must be a positive integer`);
@@ -117,7 +121,7 @@ export function generate(store: Store, config: Config) {
     .update(JSON.stringify({ generatorVersion: 1, ...config }))
     .digest('hex')
     .slice(0, 12);
-  if (store.db.prepare('SELECT id FROM generation_runs WHERE id=?').get(run))
+  if (await store.db.prepare('SELECT id FROM generation_runs WHERE id=$1').get(run))
     return { run, alreadyGenerated: true };
   const rng = random(config.seed),
     pick = <T>(values: T[]) => values[Math.floor(rng() * values.length)],
@@ -151,7 +155,7 @@ export function generate(store: Store, config: Config) {
     source: 'synthetic',
     generatorVersion: 1,
   };
-  store.transaction(() => {
+  await store.transaction(async () => {
     for (let n = 0; n < config.products; n++) {
       const c = n % 7,
         entry = catalog[c],
@@ -180,8 +184,8 @@ export function generate(store: Store, config: Config) {
       };
       // Keep brand and description coherent.
       p.description = p.description.replace(entry.brands[variant % 3], p.brand);
-      store.db
-        .prepare('INSERT INTO products VALUES(?,?,?,?,?,?,?,?,?)')
+      await store.db
+        .prepare('INSERT INTO products VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)')
         .run(
           p.id,
           p.name,
@@ -195,7 +199,9 @@ export function generate(store: Store, config: Config) {
         );
       products.push(p);
       if (!unobserved && n < 12 && p.available)
-        store.db.prepare('INSERT OR IGNORE INTO trending VALUES(?,?)').run(n + 1, p.id);
+        await store.db
+          .prepare('INSERT INTO trending VALUES($1,$2) ON CONFLICT DO NOTHING')
+          .run(n + 1, p.id);
     }
     for (let n = 0; n < config.shoppers; n++) {
       const cold = n >= Math.floor(config.shoppers * 0.85),
@@ -214,8 +220,8 @@ export function generate(store: Store, config: Config) {
         sparse,
       };
       users.push(user);
-      store.db
-        .prepare('INSERT INTO shoppers VALUES(?,?,?,?)')
+      await store.db
+        .prepare('INSERT INTO shoppers VALUES($1,$2,$3,$4)')
         .run(user.id, `Synthetic shopper ${n + 1}`, 'synthetic', user.createdAt);
     }
     const pools = new Map<number, Product[][]>();
@@ -249,10 +255,10 @@ export function generate(store: Store, config: Config) {
       const sid = id('session', sessionCount++);
       let time = base;
       const s = { id: sid, shopperId: user.id };
-      store.db
-        .prepare('INSERT INTO sessions VALUES(?,?,?,?,?)')
+      await store.db
+        .prepare('INSERT INTO sessions VALUES($1,$2,$3,$4,$5)')
         .run(sid, user.id, iso(time), iso(time), 'synthetic');
-      const emit = (type: StoreEvent['type'], context: StoreEvent['context']) => {
+      const emit = async (type: StoreEvent['type'], context: StoreEvent['context']) => {
         time += 1000 + Math.floor(rng() * 15000);
         const event: StoreEvent = {
           schemaVersion: 1,
@@ -265,22 +271,26 @@ export function generate(store: Store, config: Config) {
           source: 'synthetic',
           context,
         };
-        store.append(event);
+        await store.append(event);
         return event.id;
       };
-      emit('session_activity', { page: '/home' });
+      await emit('session_activity', { page: '/home' });
       const intent = rng() < 0.75 ? user.interest : Math.floor(rng() * 7),
         categoryPool = pool[intent].length ? pool[intent] : pool.flat();
       const searching = rng() < 0.45;
       if (searching)
-        emit('search', {
+        await emit('search', {
           query: pick(categoryPool).subcategory.toLowerCase(),
           surface: 'search',
           page: '/catalog',
         });
       const rounds = user.sparse ? 1 : 1 + Math.floor(rng() * 3);
       for (let round = 0; round < rounds; round++) {
-        const exposure: { p: Product; impression: string; position: number }[] = [];
+        const exposure: {
+          p: Product;
+          impression: string;
+          position: number;
+        }[] = [];
         const seen = new Set<string>();
         for (let position = 1; position <= 6; position++) {
           const relevant = rng() < 0.82;
@@ -292,7 +302,7 @@ export function generate(store: Store, config: Config) {
             ];
           if (seen.has(p.id)) continue;
           seen.add(p.id);
-          const impression = emit('impression', {
+          const impression = await emit('impression', {
             productId: p.id,
             surface: searching ? 'search' : 'catalog',
             position,
@@ -313,23 +323,27 @@ export function generate(store: Store, config: Config) {
           const clickChance =
             (0.65 * affinity * brandBonus * pricePenalty) / Math.pow(position, 0.55) + 0.025;
           if (rng() > clickChance) continue;
-          emit('click', {
+          await emit('click', {
             productId: p.id,
             surface: searching ? 'search' : 'catalog',
             position,
             impressionId: impression,
           });
-          emit('product_view', { productId: p.id, page: `/products/${p.id}`, surface: 'product' });
+          await emit('product_view', {
+            productId: p.id,
+            page: `/products/${p.id}`,
+            surface: 'product',
+          });
           if (rng() < user.propensity * pricePenalty + 0.035) {
             const previous =
-              store.cart(user.id).find((item) => item.product.id === p.id)?.quantity ?? 0;
+              (await store.cart(user.id)).find((item) => item.product.id === p.id)?.quantity ?? 0;
             const quantity = Math.min(99, previous + 1);
-            store.db
+            await store.db
               .prepare(
-                'INSERT INTO carts VALUES(?,?,?) ON CONFLICT(shopperId,productId) DO UPDATE SET quantity=excluded.quantity',
+                'INSERT INTO carts VALUES($1,$2,$3) ON CONFLICT("shopperId","productId") DO UPDATE SET quantity=excluded.quantity',
               )
               .run(user.id, p.id, quantity);
-            emit(previous ? 'cart_update' : 'cart_add', {
+            await emit(previous ? 'cart_update' : 'cart_add', {
               productId: p.id,
               quantity,
               surface: 'cart',
@@ -338,21 +352,21 @@ export function generate(store: Store, config: Config) {
           }
         }
       }
-      const cart = store.cart(user.id);
+      const cart = await store.cart(user.id);
       if (cart.length && rng() < user.propensity + 0.12) {
         const oid = id('order', orderCount++),
           orderTime = iso(time + 1000 + Math.floor(rng() * 15000));
         const total = cart.reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0);
-        store.db
-          .prepare('INSERT INTO orders VALUES(?,?,?,?,?,?)')
+        await store.db
+          .prepare('INSERT INTO orders VALUES($1,$2,$3,$4,$5,$6)')
           .run(oid, user.id, sid, orderTime, total, oid);
         for (const item of cart)
-          store.db
-            .prepare('INSERT INTO order_items VALUES(?,?,?,?,?)')
+          await store.db
+            .prepare('INSERT INTO order_items VALUES($1,$2,$3,$4,$5)')
             .run(oid, item.product.id, item.product.name, item.quantity, item.product.priceCents);
         // Purchase timestamp must exactly match its authoritative order.
         time = Date.parse(orderTime);
-        store.append({
+        await store.append({
           schemaVersion: 1,
           id: id('event', eventCount++),
           type: 'purchase',
@@ -363,14 +377,16 @@ export function generate(store: Store, config: Config) {
           source: 'synthetic',
           context: { orderId: oid },
         });
-        store.db.prepare('DELETE FROM carts WHERE shopperId=?').run(user.id);
+        await store.db.prepare('DELETE FROM carts WHERE "shopperId"=$1').run(user.id);
       }
-      store.db.prepare('UPDATE sessions SET lastActiveAt=? WHERE id=?').run(iso(time), sid);
+      await store.db
+        .prepare('UPDATE sessions SET "lastActiveAt"=$1 WHERE id=$2')
+        .run(iso(time), sid);
       lastActivity.set(user.id, time);
       if (user.sparse) usedSparse.add(user.id);
     }
-    store.db
-      .prepare('INSERT INTO generation_runs VALUES(?,?)')
+    await store.db
+      .prepare('INSERT INTO generation_runs VALUES($1,$2)')
       .run(run, JSON.stringify({ ...manifest, eventCount, sessionCount, orderCount }));
   });
   return {

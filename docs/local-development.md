@@ -2,7 +2,7 @@
 
 Use this guide to run the storefront, generate test data, and load raw exports into local Bronze tables. Run commands from the repository root unless a step says otherwise.
 
-The store requires **Node 24 and npm**. Bronze ingestion also requires **uv, Python 3.12, and JDK 17 or 21**. Its Python environment lives in `tools/bronze`, independently of the recommendation projects.
+The store requires **Node 24, npm, and Docker Compose**. Bronze ingestion also requires **uv, Python 3.12, and JDK 17 or 21**. Its Python environment lives in `tools/bronze`, independently of the recommendation projects.
 
 ## Run the store
 
@@ -10,6 +10,7 @@ Install dependencies and create a small dataset for browsing:
 
 ```sh
 npm ci
+npm run db:up
 npm run seed -- --products 350 --shoppers 200 --events 20000
 ```
 
@@ -25,7 +26,7 @@ Start the storefront in another terminal:
 npm run dev:web
 ```
 
-Open http://127.0.0.1:5173. The API runs at http://127.0.0.1:3001, and Vite forwards `/api` requests to it. Store data is saved in `data/store.sqlite` by default.
+Open http://127.0.0.1:5173. The API runs at http://127.0.0.1:3001, and Vite forwards `/api` requests to it. PostgreSQL 18 runs in Docker. Store data lives in the named volume `recsys-project_store-postgres` (the prefix follows the Compose project name) mounted at `/var/lib/postgresql`. The [official image documentation](https://hub.docker.com/_/postgres) describes this PostgreSQL 18 volume layout. Container recreation and `npm run db:down` retain the volume. `docker compose down -v` deletes it. Credentials `store`/`store` and the loopback port binding are intended for this local demo.
 
 You can browse as a guest or switch between demo personas. Each shopper keeps their own cart and order history. Switching personas or reloading starts a new session; sessions expire after 30 minutes of inactivity. The browser remembers the guest identity in localStorage. This demo identity mechanism does not provide authentication.
 
@@ -33,15 +34,18 @@ You can browse as a guest or switch between demo personas. Each shopper keeps th
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `STORE_DB` | SQLite database used by the API and store commands | `data/store.sqlite` |
+| `STORE_DATABASE_URL` | PostgreSQL connection used by the API and store commands | `postgresql://store:store@127.0.0.1:5432/store` |
+| `STORE_POSTGRES_PORT` | Host port published by Docker Compose | `5432` |
+| `STORE_TEST_DATABASE_URL` | Optional test connection; requires schema creation permissions | `STORE_DATABASE_URL` or the default URL |
 | `PORT` | API port | `3001` |
 | `STORE_API_ORIGIN` | API address used by Vite's development proxy | `http://127.0.0.1:3001` |
 
-For example, to run an experiment on another database and API port:
+The seed and export commands accept `--db` with a PostgreSQL URL. To use a separate experiment database, create it once:
 
 ```sh
-npm run seed -- --db data/experiment.sqlite --products 350 --shoppers 200 --events 20000
-STORE_DB=data/experiment.sqlite PORT=3002 npm run dev:api
+docker compose exec postgres createdb -U store experiment
+npm run seed -- --db postgresql://store:store@127.0.0.1:5432/experiment --products 350 --shoppers 200 --events 20000
+STORE_DATABASE_URL=postgresql://store:store@127.0.0.1:5432/experiment PORT=3002 npm run dev:api
 ```
 
 In the storefront terminal, point Vite at that port:
@@ -50,7 +54,9 @@ In the storefront terminal, point Vite at that port:
 STORE_API_ORIGIN=http://127.0.0.1:3002 npm run dev:web
 ```
 
-Set `STORE_DB` for export and reset commands too when working with that database. The seed and export commands also accept `--db`.
+Set `STORE_DATABASE_URL` for export and reset commands too when working with that database. If you change `STORE_POSTGRES_PORT`, update connection URLs to match.
+
+To stop PostgreSQL while retaining data, run `npm run db:down`; restart with `npm run db:up`.
 
 For deployment, the frontend host must serve `index.html` for frontend routes and forward `/api` to the backend. See [storefront behavior](implementation/storefront.md) for navigation and catalog details.
 
@@ -64,15 +70,15 @@ npm run seed
 
 Defaults are 10,000 products, 20,000 shoppers, and roughly 1 million events over 90 days, starting July 1, 2026 UTC. The window ends September 29, with a September 11 cutoff for introducing cold-start products and shoppers.
 
-For a separate experiment, choose a database and seed:
+For a separate experiment, use the database created above and choose a seed:
 
 ```sh
-npm run seed -- --db data/experiment.sqlite --seed 7 --products 1000 --shoppers 2000 --events 100000
+npm run seed -- --db postgresql://store:store@127.0.0.1:5432/experiment --seed 7 --products 1000 --shoppers 2000 --events 100000
 ```
 
 Use `--start` with a UTC ISO timestamp and `--days` to change the history window. The window must end in the past. Minimums are 35 products, 20 shoppers, and 10 days. The event count is approximate because generation finishes the last session before stopping.
 
-Repeating a completed configuration skips generation. Changing the configuration adds another synthetic population to the same database; it does not replace the previous one. The first seed establishes the fixed homepage trending list. Use separate databases to keep experiments independent. Generation runs in one transaction and can block writes from a running store.
+Repeating a completed configuration skips generation. Changing the configuration adds another synthetic population to the same database; it does not replace the previous one. The first seed establishes the fixed homepage trending list. Use separate databases to keep experiments independent. Generation runs in one transaction and serializes event-producing writes from a running store. PostgreSQL generation performs network round trips; its performance at the full default scale has not been benchmarked.
 
 Generator diagnostics are written to `data/generator-diagnostics/<run>.json`. Use `--diagnostics` to choose another directory. These files contain simulated preferences and cohort information; keep them out of model inputs. They are excluded from operational tables and Bronze exports.
 
@@ -83,7 +89,7 @@ The data includes browsing, clicks, persistent carts, abandoned sessions, and re
 Delivery simulation is optional. It writes a separate NDJSON file without changing the store's events or orders:
 
 ```sh
-npm run seed -- --db data/delivery-experiment.sqlite --products 350 --shoppers 200 --events 20000 --delivery data/delivery/experiment.ndjson
+npm run seed -- --db postgresql://store:store@127.0.0.1:5432/experiment --products 350 --shoppers 200 --events 20000 --delivery data/delivery/experiment.ndjson
 ```
 
 | Option | Default | Meaning |
@@ -150,6 +156,7 @@ See [exports and Bronze](implementation/bronze.md) for envelope fields, merge ke
 Run the store checks from the repository root:
 
 ```sh
+npm run db:up
 npm test
 npm run build
 npm run format:check
@@ -162,7 +169,7 @@ npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-The browser suite creates an isolated temporary store. It checks navigation, identity and cart isolation, checkout, session recovery, mobile layout, and observed events.
+The browser suite creates an isolated temporary PostgreSQL schema. It checks navigation, identity and cart isolation, checkout, session recovery, mobile layout, and observed events.
 
 For Spark/Delta integration checks, run from `tools/bronze`:
 
@@ -183,7 +190,7 @@ npm run reset:carts
 
 This appends backend cart-removal events and clears live carts. Synthetic carts, orders, shopper identities, and existing events are retained.
 
-To start a separate store experiment, seed a new database with `--db` and point the API at it with `STORE_DB`, as shown above. Each database has its own source ID. Export any learning records you want to keep before discarding a database.
+To start a separate store experiment, seed a new database with `--db` and point the API at it with `STORE_DATABASE_URL`, as shown above. Each database has its own source ID. Export any learning records you want to keep before discarding a database.
 
 To rebuild Bronze, export from sequence zero into a new directory, then ingest into a new root:
 

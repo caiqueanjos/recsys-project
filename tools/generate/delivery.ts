@@ -11,7 +11,7 @@ export type DeliveryConfig = {
   maxDelaySeconds: number;
 };
 // A separate transport experiment: never mutate the authoritative event log or orders.
-export function simulateDelivery(
+export async function simulateDelivery(
   store: Store,
   run: string,
   output: string,
@@ -40,33 +40,43 @@ export function simulateDelivery(
     original = 0,
     previousDelivery = 0;
   try {
-    for (const row of store.db
-      .prepare('SELECT payload FROM events WHERE id LIKE ? ORDER BY occurredAt,seq')
-      .iterate(`${run}-event-%`)) {
-      original++;
-      const event = JSON.parse(String(row.payload)) as StoreEvent;
-      if (rng() < config.missingRate) {
-        missing++;
-        continue;
-      }
-      const delay = Math.floor(rng() * config.maxDelaySeconds * 1000);
-      // Delay transport while retaining causal event timestamps and chronological delivery order.
-      previousDelivery = Math.max(previousDelivery, Date.parse(event.ingestedAt) + delay);
-      const write = () => {
-        const line =
-          JSON.stringify({
-            deliveryId: `${run}-delivery-${delivered++}`,
-            deliveredAt: new Date(previousDelivery).toISOString(),
-            event,
-          }) + '\n';
-        writeSync(file, line);
-        hash.update(line);
-      };
-      write();
-      if (rng() < config.duplicateRate) {
-        duplicate++;
-        previousDelivery++;
+    let cursorTime = '',
+      cursorSeq = 0;
+    while (true) {
+      const rows = await store.db
+        .prepare(
+          'SELECT payload,"occurredAt",seq FROM events WHERE id LIKE $1 AND ("occurredAt",seq)>($2,$3) ORDER BY "occurredAt",seq LIMIT 5000',
+        )
+        .all(`${run}-event-%`, cursorTime, cursorSeq);
+      if (!rows.length) break;
+      for (const row of rows) {
+        cursorTime = String(row.occurredAt);
+        cursorSeq = Number(row.seq);
+        original++;
+        const event = JSON.parse(String(row.payload)) as StoreEvent;
+        if (rng() < config.missingRate) {
+          missing++;
+          continue;
+        }
+        const delay = Math.floor(rng() * config.maxDelaySeconds * 1000);
+        // Delay transport while retaining causal event timestamps and chronological delivery order.
+        previousDelivery = Math.max(previousDelivery, Date.parse(event.ingestedAt) + delay);
+        const write = () => {
+          const line =
+            JSON.stringify({
+              deliveryId: `${run}-delivery-${delivered++}`,
+              deliveredAt: new Date(previousDelivery).toISOString(),
+              event,
+            }) + '\n';
+          writeSync(file, line);
+          hash.update(line);
+        };
         write();
+        if (rng() < config.duplicateRate) {
+          duplicate++;
+          previousDelivery++;
+          write();
+        }
       }
     }
   } finally {

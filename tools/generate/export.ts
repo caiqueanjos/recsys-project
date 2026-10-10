@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 import { Store } from '../../apps/store-api/src/db.js';
 
-export function exportBronze(
+export async function exportBronze(
   store: Store,
   output: string,
   after = 0,
@@ -17,16 +17,16 @@ export function exportBronze(
   const temp = `${output}.partial-${randomUUID()}`;
   mkdirSync(dirname(output), { recursive: true });
   mkdirSync(temp);
-  return store.transaction(() => {
+  return await store.transaction(async () => {
     const sourceId = String(
-      store.db.prepare("SELECT value FROM metadata WHERE key='sourceId'").get()!.value,
+      (await store.db.prepare("SELECT value FROM metadata WHERE key='sourceId'").get())!.value,
     );
     const highWater = Number(
-      store.db.prepare('SELECT coalesce(max(seq),0) AS n FROM events').get()!.n,
+      (await store.db.prepare('SELECT coalesce(max(seq),0) AS n FROM events').get())!.n,
     );
     if (after > highWater) throw new Error('Cursor is beyond the event log');
-    const products = store.db
-      .prepare('SELECT * FROM products WHERE listedAt<=? ORDER BY id')
+    const products = await store.db
+      .prepare('SELECT * FROM products WHERE "listedAt"<=$1 ORDER BY id')
       .all(snapshotAt);
     const snapshotId = createHash('sha256')
       .update(JSON.stringify({ sourceId, snapshotAt, products }))
@@ -51,8 +51,8 @@ export function exportBronze(
     const events = writer('events.ndjson');
     let cursor = after;
     while (cursor < highWater) {
-      const rows = store.db
-        .prepare('SELECT * FROM events WHERE seq>? AND seq<=? ORDER BY seq LIMIT 5000')
+      const rows = await store.db
+        .prepare('SELECT * FROM events WHERE seq>$1 AND seq<=$2 ORDER BY seq LIMIT 5000')
         .all(cursor, highWater);
       for (const row of rows) {
         events.line({
@@ -106,10 +106,12 @@ if (process.argv[1]?.endsWith('/export.ts')) {
       after: { type: 'string', default: '0' },
     },
   });
-  const store = new Store(values.db);
+  const store = await Store.open(values.db);
   try {
-    console.log(JSON.stringify(exportBronze(store, values.output!, Number(values.after)), null, 2));
+    console.log(
+      JSON.stringify(await exportBronze(store, values.output!, Number(values.after)), null, 2),
+    );
   } finally {
-    store.db.close();
+    await store.db.close();
   }
 }

@@ -22,7 +22,7 @@ Clicks reference generated impressions. Persistent carts survive abandoned sessi
 
 The cutoff is at `floor(days × 0.8)` days after the start. The final 15% of products/shoppers are introduced after that cutoff; the final 5% are reserved unobserved entities within that cold cohort. A separate 10% shopper cohort has at most one session. Cohorts are selected by generated index, with floor rounding; finite runs need not observe every eligible entity.
 
-Latent shopper values and cohort diagnostics go to `data/generator-diagnostics/<run>.json`, not operational tables or raw exports. They are simulator internals, not legitimate model inputs. Configuration/count metadata remains in SQLite.
+Latent shopper values and cohort diagnostics go to `data/generator-diagnostics/<run>.json`, not operational tables or raw exports. They are simulator internals, not legitimate model inputs. Configuration/count metadata remains in PostgreSQL.
 
 ## Optional delivery-quality artifact
 
