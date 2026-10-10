@@ -41,7 +41,7 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 ## Local workflow and validation
 
 - Use npm workspaces and Node 24 for store development; keep the existing Python recommendation workspace independent.
-- See `docs/local-development.md` for setup, runtime prerequisites, generation, exports, ingestion, and selective resets. Default PostgreSQL URL: `postgresql://store:store@127.0.0.1:5432/store`; generated data and runtime artifacts are ignored by Git.
+- See `docs/README.md` for the documentation index and `docs/how-to/` for setup, generation, exports, ingestion, validation, and selective resets. Default PostgreSQL URL: `postgresql://store:store@127.0.0.1:5432/store`; generated data and runtime artifacts are ignored by Git.
 - Store commands: `npm run dev:api`, `npm run dev:web`, `npm run seed`, `npm run export:bronze`, and `npm run reset:carts`.
 - Run checks appropriate to the change: `npm test` for API/history contracts, `npm run test:browser` for storefront flows, `npm run build` for TypeScript and production assets, and `npm run format:check` for formatting. Chromium and its system dependencies are needed for browser checks.
 - For ingestion changes, run `uv run python -m unittest discover -s tests -v` from `tools/bronze`. Spark requires JDK 17/21, local JVM sockets, and first-run Maven downloads.
@@ -51,6 +51,6 @@ This is a learning project for recommender systems. The user is the Staff/Senior
 
 ## Reference and plan
 
-Use `docs/README.md` as the documentation index for current implementation explanations and feature references. Follow `docs/implementation-plan.md` for agreed scope and implementation decisions; all six scaffold stages are implemented. Use `docs/store-contract.md` for endpoint/event semantics and `docs/local-development.md` for runnable workflows. The architectural reference is https://www.databricks.com/blog/real-time-retail-intelligence-building-e-commerce-recommendations-lakebase-and-ai-search.
+Use `docs/README.md` as the Diátaxis documentation index. Follow `docs/reference/project-scope.md` for agreed scope and implementation decisions; all six scaffold stages are implemented. Use `docs/reference/http-api.md` and `docs/reference/events.md` for endpoint/event semantics, and `docs/how-to/` for runnable workflows. Tutorials in `docs/tutorials/` build simplified teaching mocks in a separate workspace before exercising this repository; distinguish those mocks from implemented behavior. The architectural reference is https://www.databricks.com/blog/real-time-retail-intelligence-building-e-commerce-recommendations-lakebase-and-ai-search.
 
 Preserve the distinction between offline event ingestion and direct session context in future online recommendation requests. PostgreSQL is the store database, not the analytical lakehouse or recommendation feature store.
