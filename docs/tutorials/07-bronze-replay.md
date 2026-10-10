@@ -1,6 +1,6 @@
-# 7. Export raw data and recover an interrupted ingestion
+# Repository exercise C: export raw data and recover an interrupted ingestion
 
-You will inspect a raw export, interrupt ingestion after one table commits, and replay it without duplicating events. Use this repository and the `docs_demo` database from lesson 5. Lesson 6 explains how small synthetic histories are built; its temporary fixtures are separate from this database. You now need uv, Python 3.12, and JDK 17 or 21. Spark requires local JVM sockets and first-run Maven downloads. Run from the repository root unless told otherwise.
+You will inspect a raw export, interrupt ingestion after one table commits, and replay it without duplicating events. Use this repository and the `docs_demo` database from [exercise A](05-observe-the-store.md). [Exercise B](06-synthetic-history.md) explains how small synthetic histories are built; its temporary fixtures are separate from this database. Use the [machine setup guide](../how-to/prepare-your-machine.md) to check uv, Python 3.12, and JDK 17 or 21. Spark requires local JVM sockets and first-run Maven downloads. Run from the repository root unless told otherwise.
 
 ## 1. Publish a small immutable batch
 

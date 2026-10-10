@@ -2,6 +2,8 @@
 
 You will give two demo shoppers separate carts and make repeated checkout requests return one order. Continue in `store-lab` after lessons 1–2. This lesson adds the API behavior first; the existing catalog UI continues to work. There are no payments, shipping, authentication, or persistent storage in this mock.
 
+Before starting, complete [machine setup](../how-to/prepare-your-machine.md) and read the **before lesson 3** section of [learning foundations](../explanation/learning-foundations.md).
+
 ## 1. Model the state in memory
 
 Create `apps/store-api/src/checkout.ts`:

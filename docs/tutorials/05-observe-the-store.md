@@ -1,6 +1,6 @@
-# 5. Follow a browser action into an event
+# Repository exercise A: follow a browser action into an event
 
-You will run the implemented store in a separate database, observe one exposure/click, and find a committed purchase. This lesson uses **this repository**, not `store-lab`. You need Node 24/npm and Docker Compose; no Spark yet. Stop the lab API and any existing API using port 3001.
+You will run the implemented store in a separate database, observe one exposure/click, and find a committed purchase. This comparison exercise uses **this repository**, not `store-lab`; return to the reference checkout containing these docs. Finish the [lab build path](07-build-bronze.md) first, or use this as an independent operational exercise. You need Node 24/npm and Docker Compose; no Spark yet. Stop the lab API and any existing API using port 3001.
 
 ## 1. Prepare an isolated store
 
@@ -15,7 +15,7 @@ npm run seed -- --seed 17 --products 140 --shoppers 80 --events 1000 --days 10 -
 npm run dev:api
 ```
 
-Use a new database name if `docs_demo` already exists, and substitute it throughout this lesson and lesson 7. The summary should contain a run ID and generated counts. This data is synthetic, but its records use the live contract.
+Use a new database name if `docs_demo` already exists, and substitute it throughout this exercise and [repository exercise C](07-bronze-replay.md). The summary should contain a run ID and generated counts. This data is synthetic, but its records use the live contract.
 
 In another repository-root terminal, run `npm run dev:web`. Open http://127.0.0.1:5173. Select **Alex · home projects** to make the SQL identity in this exercise stable.
 
@@ -70,6 +70,6 @@ Expect one matching order/purchase pair with `source=store_backend` and `matchin
 
 Switch to Sam and open the bag/history. Alex's order should not appear. Switch back to Alex; the order remains. Each switch/reload creates a session without replacing the shopper. In SQL, multiple live sessions should now exist for `persona-home`.
 
-You have observed the whole path from visible product to attributed click and authoritative purchase. Keep `docs_demo` for the next lesson. Stop API/Vite when finished; retain PostgreSQL.
+You have observed the whole path from visible product to attributed click and authoritative purchase. Keep `docs_demo` for repository exercise C. Stop API/Vite when finished; retain PostgreSQL.
 
-Next: [6. Generate a tiny reproducible history](06-synthetic-history.md), then [7. Export and recover raw ingestion](07-bronze-replay.md). Look up [event rules](../reference/events.md) or read [what observations mean](../explanation/observations.md). [Index](../README.md).
+Next comparison: [B. Generate a tiny reproducible history](06-synthetic-history.md), then [C. Export and recover raw ingestion](07-bronze-replay.md). Look up [event rules](../reference/events.md) or read [what observations mean](../explanation/observations.md). [Index](../README.md).

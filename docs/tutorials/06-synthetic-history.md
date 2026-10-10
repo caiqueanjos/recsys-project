@@ -1,6 +1,6 @@
-# 6. Generate a tiny reproducible history
+# Repository exercise B: generate a tiny reproducible history
 
-You will build a small seeded simulator instead of creating unrelated random event rows. Use this repository after lesson 5, with npm dependencies and PostgreSQL running. No Python or model training is needed. The script below creates two private test schemas, compares their events, exports one, and cleans up both schemas. It leaves the normal store and `docs_demo` untouched.
+You will build a small seeded simulator instead of creating unrelated random event rows. Use the reference repository after [exercise A](05-observe-the-store.md), with npm dependencies and PostgreSQL running. No Python or model training is needed. The script below creates two private test schemas, compares their events, exports one, and cleans up both schemas. It leaves the normal store and `docs_demo` untouched.
 
 ## 1. Define a repeatable sequence
 
@@ -135,6 +135,6 @@ This tiny simulator has one shopper, two products, no latent preferences, no car
 
 Open [generator.ts](../../tools/generate/generator.ts). Compare its seeded RNG, configuration-based IDs, product listing dates, per-shopper chronology, exposure-before-click ordering, and persistent cart/order writes to this small loop. Look up [generator reference](../reference/generator.md) for cohort definitions and [synthetic-data explanation](../explanation/synthetic-data.md) for evaluation limits.
 
-You have generated coherent observations using the same raw contract as the live store. The next lesson uses `docs_demo` to include both synthetic history and the live actions from lesson 5; it does not ingest this temporary fixture automatically.
+You have generated coherent observations using the same raw contract as the live store. The next lesson uses `docs_demo` to include both synthetic history and the live actions from exercise A; it does not ingest this temporary fixture automatically.
 
-Next: [7. Export and recover raw ingestion](07-bronze-replay.md). [Index](../README.md).
+Next comparison: [C. Export and recover raw ingestion](07-bronze-replay.md). [Index](../README.md).

@@ -2,6 +2,8 @@
 
 You will build a tiny TypeScript API that serves two products and test it without opening a network port. You need Node 24 and npm. Use a new directory outside this repository; these files are teaching implementations, not replacements for the checked-in store.
 
+Before starting, complete [machine setup](../how-to/prepare-your-machine.md) and read the **before lesson 1** section of [learning foundations](../explanation/learning-foundations.md).
+
 ## 1. Create the package boundaries
 
 In a terminal, choose a parent directory where you keep learning projects:

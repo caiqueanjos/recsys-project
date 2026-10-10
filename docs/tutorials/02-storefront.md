@@ -2,6 +2,8 @@
 
 You will render fixed products first, then fetch them through the API from lesson 1. You will also make search and product links survive a reload. Continue in the same `store-lab` directory, with Node/npm installed.
 
+Before starting, complete [machine setup](../how-to/prepare-your-machine.md) and read the **before lesson 2** section of [learning foundations](../explanation/learning-foundations.md).
+
 ## 1. Add a React workspace
 
 From the lab root:
