@@ -2,6 +2,121 @@
 
 Schema: [schema.ts](../../apps/store-api/src/schema.ts). Connection/transaction helpers: [db.ts](../../apps/store-api/src/db.ts). The API stores operations and append-only events in one PostgreSQL database, normally its `public` schema.
 
+Use this page to identify where store data lives, how tables relate, and which rules the database enforces. This is the implemented store schema, not the separate tutorial lab or a proposed recommendation feature store.
+
+## Database design diagram
+
+The entity relationship diagram below shows all eleven tables. `PK` means primary key (a row's unique identity), `FK` means foreign key (a reference enforced by PostgreSQL), and `UK` means unique key. A line from `||` to `o{` means one parent can have zero or more child rows; each child references exactly one parent. Fields marked `PK` together form a composite primary key.
+
+```mermaid
+erDiagram
+    products ||--o{ trending : "appears at positions"
+    products ||--o{ carts : "in current carts"
+    products ||--o{ order_items : "purchased as"
+    shoppers ||--o{ sessions : "starts"
+    shoppers ||--o{ carts : "owns"
+    shoppers ||--o{ orders : "places"
+    shoppers ||--o{ events : "associated with"
+    sessions ||--o{ orders : "checkout during"
+    sessions ||--o{ events : "groups"
+    orders ||--o{ order_items : "contains"
+
+    products {
+        TEXT id PK
+        TEXT name
+        TEXT category
+        TEXT subcategory
+        TEXT brand
+        TEXT description
+        INTEGER priceCents
+        INTEGER available "0 or 1"
+        TEXT listedAt
+    }
+    trending {
+        INTEGER position PK
+        TEXT productId FK
+    }
+    shoppers {
+        TEXT id PK
+        TEXT name
+        TEXT kind
+        TEXT createdAt
+    }
+    sessions {
+        TEXT id PK
+        TEXT shopperId FK
+        TEXT startedAt
+        TEXT lastActiveAt
+        TEXT source
+    }
+    carts {
+        TEXT shopperId PK, FK
+        TEXT productId PK, FK
+        INTEGER quantity
+    }
+    orders {
+        TEXT id PK
+        TEXT shopperId FK
+        TEXT sessionId FK
+        TEXT createdAt
+        INTEGER totalCents
+        TEXT idempotencyKey
+    }
+    order_items {
+        TEXT orderId PK, FK
+        TEXT productId PK, FK
+        TEXT name
+        INTEGER quantity
+        INTEGER unitPriceCents
+    }
+    events {
+        BIGINT seq PK
+        TEXT id UK
+        TEXT type
+        TEXT occurredAt
+        TEXT ingestedAt
+        TEXT shopperId FK
+        TEXT sessionId FK
+        TEXT source
+        TEXT payload "complete event JSON"
+    }
+    event_counter {
+        INTEGER id PK "singleton: 1"
+        BIGINT value
+    }
+    metadata {
+        TEXT key PK
+        TEXT value
+    }
+    generation_runs {
+        TEXT id PK
+        TEXT manifest "JSON"
+    }
+```
+
+All diagram edges represent declared SQL foreign keys. The three standalone tables have no foreign keys: `event_counter` allocates event sequences through application SQL, `metadata` stores the persistent export source identity, and `generation_runs` records completed synthetic runs. The composite unique constraint on `orders(sessionId, idempotencyKey)` is listed below; neither field is individually unique. SQL permits the same product at multiple `trending` positions.
+
+### Reading the design
+
+- **Catalog:** `products` holds current product data. `trending` maps fixed homepage positions to products; it contains no model scores or attribution.
+- **Identity and current state:** a shopper can have many sessions. Cart rows belong to the shopper, so starting a new session does not discard that shopper's cart. There is no separate cart header table: each row is one product and quantity for a shopper.
+- **Purchase history:** an order identifies both the shopper and the checkout session. Its `order_items` retain purchased names and unit prices, so later catalog edits do not rewrite those values. The diagram allows zero items because foreign keys alone do not require an order to have children; the checkout operation creates items for a nonempty cart.
+- **Behavioral history:** `events` holds both browser observations and confirmed backend transactions, as well as synthetic history. Its indexed columns support lookup and export, while `payload` retains the complete versioned event JSON, including context and `schemaVersion`.
+
+For example, a shopper's session can generate an impression and click, then update a cart row. Checkout creates an order and its items, appends a purchase event, and clears the shopper's cart in one transaction. The order and events remain after the cart is cleared.
+
+### References inside event JSON
+
+`payload.context.productId`, `orderId`, and `impressionId` are application-validated references inside JSON text, not SQL foreign-key columns. They are deliberately omitted from the foreign-key diagram:
+
+| Context field | Reference checked by `Store.append` |
+| --- | --- |
+| `productId` | Product exists and was listed at the event time |
+| `orderId` for a purchase | Order exists and matches the event session and occurrence time |
+| `impressionId` for a click | Prior impression matches session, product, surface, and position |
+
+`Store.append` also checks that the event's shopper matches its session. The independent shopper and session foreign keys do not enforce that pairing on their own. See the [event contract](events.md) for required context fields and attribution rules.
+
 ## Tables
 
 | Table             | Keys and constraints                                               | Stored fields/purpose                                             |

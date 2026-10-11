@@ -46,7 +46,7 @@ The teaching mocks omit features deliberately. They are labeled where introduced
 - [Repository map and runtime configuration](reference/workspace.md).
 - [Store HTTP API](reference/http-api.md).
 - [Event contract v1](reference/events.md).
-- [Operational database](reference/database.md).
+- [Operational database and relationship diagram](reference/database.md).
 - [Generator and command options](reference/generator.md).
 - [Export format and Bronze protocol](reference/bronze.md).
 - [Frontend routes and state](reference/frontend.md).
