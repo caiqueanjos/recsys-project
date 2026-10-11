@@ -6,7 +6,7 @@ Use this guide when extending the implemented storefront or API. Prerequisites: 
 
 For example, to change catalog filtering, trace [CatalogPage](../../apps/web/src/pages/CatalogPage.tsx) → [useResource](../../apps/web/src/hooks/useResource.ts) → [GET /products](../../apps/store-api/src/server.ts) → SQL. Decide the URL/query semantics before changing the UI so copied URLs and Back/Forward work.
 
-For a cart change, trace [StoreProvider.mutate](../../apps/web/src/state/StoreProvider.tsx) → cart route → [Store.transaction](../../apps/store-api/src/db.ts) → backend event. Keep the mutation and its event in the same transaction.
+For a cart change, trace [StoreProvider.mutate](../../apps/web/src/state/StoreProvider.tsx) → cart route → [CartService.setQuantity](../../apps/store-api/src/services/cart.ts) → [Store.transaction](../../apps/store-api/src/db.ts) → backend event. Checkout follows the same boundary through [CheckoutService.execute](../../apps/store-api/src/services/checkout.ts). Keep request/session handling in the route, use-case orchestration in the service, and the mutation and its event in the same transaction.
 
 Look up the [API](../reference/http-api.md), [events](../reference/events.md), and [database](../reference/database.md) before changing boundaries. State the intended before/after behavior in a small example.
 

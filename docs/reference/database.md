@@ -146,6 +146,10 @@ Indexes exist on event session ID and order shopper ID. An append-only statement
 | `product(id)`                                   | Product or undefined; helper itself does not filter future listings                      |
 | `cart(shopperId)`                               | Joins cart to current product data                                                       |
 | `order(id)`                                     | Order with historical item name/price snapshots; caller must supply existing ID          |
+| `setCartQuantity(shopperId, productId, quantity)` | Upserts a cart line, or deletes it for zero; caller owns validation, transaction, and event |
+| `clearCart(shopperId)`                          | Deletes all cart lines for the shopper; caller owns transaction and causal event          |
+| `orderForCheckout(sessionId, idempotencyKey)`    | Existing order for a checkout retry, or undefined                                         |
+| `createOrder(order, idempotencyKey)`             | Inserts order and item snapshots; caller owns the encompassing transaction                |
 | `append(event)`                                 | Validates identity/references/replay, increments transactional sequence, inserts payload |
 | `event(session, type, context, time?, source?)` | Creates UUID event; defaults to backend source and current time                          |
 | `seedPersonas()`                                | Inserts the three stable demo personas if absent                                         |

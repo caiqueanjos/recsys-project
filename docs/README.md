@@ -55,6 +55,7 @@ The teaching mocks omit features deliberately. They are labeled where introduced
 ## Explanation: understand the design
 
 - [Learning foundations: types, React, SQL, and Spark](explanation/learning-foundations.md).
+- [Understand the Node store backend using Python concepts](explanation/node-backend-for-python-developers.md).
 - [System boundaries and data flow](explanation/architecture.md).
 - [How mocks help you build in stages](explanation/mocks-and-increments.md).
 - [Shopper identity, sessions, and browser state](explanation/identity-and-navigation.md).

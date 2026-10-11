@@ -109,6 +109,44 @@ export class Store {
         .all(id),
     } as Order;
   }
+  async setCartQuantity(shopperId: string, productId: string, quantity: number): Promise<void> {
+    if (quantity === 0)
+      await this.db
+        .prepare('DELETE FROM carts WHERE "shopperId"=$1 AND "productId"=$2')
+        .run(shopperId, productId);
+    else
+      await this.db
+        .prepare(
+          'INSERT INTO carts VALUES($1,$2,$3) ON CONFLICT("shopperId","productId") DO UPDATE SET quantity=excluded.quantity',
+        )
+        .run(shopperId, productId, quantity);
+  }
+  async clearCart(shopperId: string): Promise<void> {
+    await this.db.prepare('DELETE FROM carts WHERE "shopperId"=$1').run(shopperId);
+  }
+  async orderForCheckout(sessionId: string, idempotencyKey: string): Promise<Order | undefined> {
+    const row = await this.db
+      .prepare('SELECT id FROM orders WHERE "sessionId"=$1 AND "idempotencyKey"=$2')
+      .get(sessionId, idempotencyKey);
+    return row ? this.order(String(row.id)) : undefined;
+  }
+  // The caller owns the transaction spanning this insert and its other changes.
+  async createOrder(order: Order, idempotencyKey: string): Promise<void> {
+    await this.db
+      .prepare('INSERT INTO orders VALUES($1,$2,$3,$4,$5,$6)')
+      .run(
+        order.id,
+        order.shopperId,
+        order.sessionId,
+        order.createdAt,
+        order.totalCents,
+        idempotencyKey,
+      );
+    for (const item of order.items)
+      await this.db
+        .prepare('INSERT INTO order_items VALUES($1,$2,$3,$4,$5)')
+        .run(order.id, item.productId, item.name, item.quantity, item.unitPriceCents);
+  }
   async append(input: StoreEvent): Promise<void> {
     if (!this.context.getStore()) return this.transaction(() => this.append(input));
     const event = eventSchema.parse(input);

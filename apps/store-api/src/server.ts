@@ -3,9 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { browserTypes, eventSchema, type Session, type StoreEvent } from '@store/contracts';
 import { Store } from './db.js';
+import { CartService } from './services/cart.js';
+import { CheckoutService } from './services/checkout.js';
+import { StoreOperationError } from './services/errors.js';
 
 export async function buildServer(providedStore?: Store) {
   const store = providedStore ?? (await Store.open());
+  const cartService = new CartService(store);
+  const checkoutService = new CheckoutService(store);
   const app = Fastify({ logger: false, bodyLimit: 256 * 1024 });
   await store.seedPersonas();
   const fail = (message: string, statusCode = 400): never => {
@@ -28,7 +33,15 @@ export async function buildServer(providedStore?: Store) {
     const e = error as Error & {
       statusCode?: number;
     };
-    reply.code(e instanceof z.ZodError ? 400 : (e.statusCode ?? 400)).send({ error: e.message });
+    const statusCode =
+      e instanceof StoreOperationError
+        ? e.code === 'product_not_found'
+          ? 404
+          : 409
+        : e instanceof z.ZodError
+          ? 400
+          : (e.statusCode ?? 400);
+    reply.code(statusCode).send({ error: e.message });
   });
   app.get('/health', async () => ({ status: 'ok' }));
   app.get(
@@ -114,62 +127,14 @@ export async function buildServer(providedStore?: Store) {
         productId: string;
       };
     const { quantity } = z.object({ quantity: z.number().int().min(0).max(99) }).parse(req.body);
-    return await store.transaction(async () => {
-      const product = await store.product(productId);
-      if (!product || product.listedAt > new Date().toISOString())
-        return fail('Product not found', 404);
-      if (quantity && !product.available) fail('Product unavailable', 409);
-      const previous =
-        (await store.cart(s.shopperId)).find((item) => item.product.id === productId)?.quantity ??
-        0;
-      if (previous !== quantity) {
-        if (quantity === 0)
-          await store.db
-            .prepare('DELETE FROM carts WHERE "shopperId"=$1 AND "productId"=$2')
-            .run(s.shopperId, productId);
-        else
-          await store.db
-            .prepare(
-              'INSERT INTO carts VALUES($1,$2,$3) ON CONFLICT("shopperId","productId") DO UPDATE SET quantity=excluded.quantity',
-            )
-            .run(s.shopperId, productId, quantity);
-        await store.event(
-          s,
-          quantity === 0 ? 'cart_remove' : previous === 0 ? 'cart_add' : 'cart_update',
-          { productId, quantity, page: '/cart', surface: 'cart' },
-        );
-      }
-      return await store.cart(s.shopperId);
-    });
+    return cartService.setQuantity(s, productId, quantity);
   });
   app.post('/checkout', async (req) => {
     const s = await session(req);
     const { idempotencyKey } = z
       .object({ idempotencyKey: z.string().min(1).max(128) })
       .parse(req.body);
-    return await store.transaction(async () => {
-      const prior = await store.db
-        .prepare('SELECT id FROM orders WHERE "sessionId"=$1 AND "idempotencyKey"=$2')
-        .get(s.id, idempotencyKey);
-      if (prior) return await store.order(String(prior.id));
-      const items = await store.cart(s.shopperId);
-      if (!items.length) fail('Cart is empty', 409);
-      if (items.some((item) => !item.product.available))
-        fail('Cart contains unavailable products', 409);
-      const id = randomUUID(),
-        now = new Date().toISOString(),
-        total = items.reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0);
-      await store.db
-        .prepare('INSERT INTO orders VALUES($1,$2,$3,$4,$5,$6)')
-        .run(id, s.shopperId, s.id, now, total, idempotencyKey);
-      for (const item of items)
-        await store.db
-          .prepare('INSERT INTO order_items VALUES($1,$2,$3,$4,$5)')
-          .run(id, item.product.id, item.product.name, item.quantity, item.product.priceCents);
-      await store.event(s, 'purchase', { orderId: id }, now);
-      await store.db.prepare('DELETE FROM carts WHERE "shopperId"=$1').run(s.shopperId);
-      return await store.order(id);
-    });
+    return checkoutService.execute(s, idempotencyKey);
   });
   app.get('/orders', async (req) => {
     const s = await session(req);

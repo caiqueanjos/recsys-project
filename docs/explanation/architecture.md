@@ -29,6 +29,14 @@ Bronze answers provenance questions: what raw records arrived from a particular 
 
 Raw ingestion does not build features. Cleaning, sessionization, embeddings, candidate retrieval, ranking, and evaluation belong to the user's recommendation workspace. The [scope reference](../reference/project-scope.md) records this ownership.
 
+## Cart and checkout services own use cases
+
+The cart mutation and checkout handlers in [server.ts](../../apps/store-api/src/server.ts) resolve the live session, validate HTTP input, and delegate to [CartService](../../apps/store-api/src/services/cart.ts) or [CheckoutService](../../apps/store-api/src/services/checkout.ts). The services accept ordinary session data and have no Fastify dependency. They decide the business steps and wrap the entire operation in `Store.transaction`.
+
+`CartService.setQuantity` checks product listing/availability and records an event only when the quantity changes. `CheckoutService.execute` checks the retry key before cart validation, calculates totals and purchased item snapshots, persists the order, records purchase, and clears the cart. [Store](../../apps/store-api/src/db.ts) supplies parameterized persistence methods and the existing transaction/event integrity machinery. Business errors carry application codes; the HTTP adapter maps them to 404 or 409 responses.
+
+This is a focused service layer for those two writes. Catalog, identity, order-history reads, and browser event intake still use the existing handlers. There are no new repository interfaces, ORM, or rich domain entities. Services assume callers have resolved the session and validated input; direct calls do not enforce HTTP session expiry or refresh activity. See the [Python comparison](node-backend-for-python-developers.md) for how these boundaries map to familiar Python patterns.
+
 ## Future online context is a separate path
 
 Suppose a shopper views three tents within a minute. A future session-aware recommendation request should be able to send those current views directly, even if the latest raw export has not reached Bronze. Long-term features can still come from an offline pipeline. Waiting for the analytical landing step would turn ingestion delay into recommendation context delay.

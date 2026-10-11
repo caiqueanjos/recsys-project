@@ -150,6 +150,57 @@ test('checkout failure leaves cart and events intact', async (t) => {
   await app.close();
 });
 
+test('cart and checkout routes preserve validation and application error responses', async (t) => {
+  const { store, cleanup } = await temporaryStore();
+  t.after(cleanup);
+  const app = await buildServer(store);
+  t.after(() => app.close());
+  await store.db
+    .prepare('INSERT INTO products VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)')
+    .run('p', 'Soap', 'Personal Care', 'Bath', 'Pure', 'Soap', 500, 0, '2025-01-01T00:00:00.000Z');
+  const session = (
+    await app.inject({ method: 'POST', url: '/sessions', payload: { shopperId: 'persona-home' } })
+  ).json();
+  const headers = { 'x-session-id': session.id };
+  for (const [productId, error, statusCode] of [
+    ['missing', 'Product not found', 404],
+    ['p', 'Product unavailable', 409],
+  ] as const) {
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/cart/${productId}`,
+      headers,
+      payload: { quantity: 1 },
+    });
+    assert.equal(response.statusCode, statusCode);
+    assert.deepEqual(response.json(), { error });
+  }
+  assert.equal(
+    (await app.inject({ method: 'PUT', url: '/cart/p', headers, payload: { quantity: 100 } }))
+      .statusCode,
+    400,
+  );
+  const empty = await app.inject({
+    method: 'POST',
+    url: '/checkout',
+    headers,
+    payload: { idempotencyKey: 'empty' },
+  });
+  assert.equal(empty.statusCode, 409);
+  assert.deepEqual(empty.json(), { error: 'Cart is empty' });
+  assert.equal(
+    (
+      await app.inject({
+        method: 'POST',
+        url: '/checkout',
+        headers,
+        payload: { idempotencyKey: '' },
+      })
+    ).statusCode,
+    400,
+  );
+});
+
 test('concurrent checkout retries commit one purchase and failed event batches leave no sequence gaps', async (t) => {
   const fixture = await temporaryStore();
   t.after(() => fixture.cleanup());
