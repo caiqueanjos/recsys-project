@@ -59,7 +59,7 @@ The teaching mocks omit features deliberately. They are labeled where introduced
 - [System boundaries and data flow](explanation/architecture.md).
 - [How mocks help you build in stages](explanation/mocks-and-increments.md).
 - [Shopper identity, sessions, and browser state](explanation/identity-and-navigation.md).
-- [Atomic checkout, retries, and event sequences](explanation/transactions.md).
+- [Atomic and idempotent checkout, retries, and event sequences](explanation/transactions.md).
 - [What behavioral events can tell you](explanation/observations.md).
 - [What synthetic history can and cannot teach you](explanation/synthetic-data.md).
 - [Why Bronze needs snapshots and durable progress](explanation/bronze-recovery.md).
